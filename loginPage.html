@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | BWC-HDMS Portal</title>
+    <link rel="stylesheet" href="icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="cssStyle.css">
+</head>
+<body class="login-body">
+
+    <!-- Floating Theme Toggle in Top Right -->
+    <div style="position: fixed; top: 1.25rem; right: 1.25rem; z-index: 50;">
+        <button class="theme-toggle-btn" id="darkModeToggle" title="Toggle Dark/Light Mode">
+            <i class="bi bi-sun-fill" id="themeIcon"></i>
+            <span id="themeText">Light</span>
+        </button>
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div class="toast-container">
+        <div id="liveToast" class="toast-pill toast-success hidden" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex align-center gap-2">
+                <i class="bi bi-check-circle-fill" id="toastIcon"></i>
+                <span id="toastMessage">Action completed successfully.</span>
+            </div>
+            <button type="button" class="toast-close-btn" onclick="hideToast()" aria-label="Close">&times;</button>
+        </div>
+    </div>
+
+    <!-- Login Card Container -->
+    <div class="login-card">
+        <div class="login-brand-header">
+            <div class="login-logo">
+                <i class="bi bi-heart-pulse-fill"></i>
+            </div>
+            <h1 class="login-title">BWC-HDMS <small class="text-muted fw-medium" style="font-size: 0.85rem;">v2.4</small></h1>
+            <p class="login-subtitle">Barangay Wellness Circle &mdash; Hypertension & Diabetes Management System</p>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label class="form-label" for="loginStation">Select Health Station / Purok</label>
+                <select class="form-select" id="loginStation" required>
+                    <option value="BHS Purok 3 Station">BHS Purok 3 Station</option>
+                    <option value="BHS Purok 1 Station">BHS Purok 1 Station</option>
+                    <option value="BHS Purok 2 Station">BHS Purok 2 Station</option>
+                    <option value="BHS Purok 4 Station">BHS Purok 4 Station</option>
+                    <option value="Main Barangay Health Center">Main Barangay Health Center</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="loginUsername">Staff ID / Midwife Name</label>
+                <input type="text" class="form-control" id="loginUsername" value="Midwife Maria" required>
+            </div>
+
+            <div class="form-group mb-4">
+                <label class="form-label" for="loginPassword">Station Security PIN / Password</label>
+                <input type="password" class="form-control" id="loginPassword" value="123456" placeholder="Enter station password" required>
+            </div>
+
+            <!-- Data Privacy Agreement (RA 10173) -->
+            <div style="padding: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-surface-secondary); margin-bottom: 1.25rem;">
+                <div class="d-flex align-center gap-2">
+                    <input type="checkbox" id="privacyCheck" checked style="width: 1.05rem; height: 1.05rem; cursor: pointer;">
+                    <label for="privacyCheck" class="fw-semibold text-muted" style="font-size: 0.75rem; cursor: pointer; line-height: 1.35;">
+                        I agree to process health records securely under the <strong>Data Privacy Act of 2012 (RA 10173)</strong>.
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full py-2 fw-semibold" id="loginBtn">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Sign In to Terminal Station
+            </button>
+        </form>
+
+        <div class="text-center mt-4" style="margin-top: 1.25rem;">
+            <small class="text-muted" style="font-size: 0.7rem;">
+                <i class="bi bi-shield-check text-success me-1"></i>Secure Offline Station &bull; Local Storage &bull; RHU Encrypted
+            </small>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="shared.js"></script>
+    <script src="loginPage.js"></script>
+</body>
+</html>

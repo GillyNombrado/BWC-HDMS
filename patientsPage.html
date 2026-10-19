@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patients Registry | BWC-HDMS Portal</title>
+    <!-- Local Offline Assets -->
+    <link rel="stylesheet" href="icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="cssStyle.css">
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    <header class="header-navbar">
+        <div class="header-container">
+            <a class="brand-link" href="dashboardPage.html">
+                <i class="bi bi-heart-pulse-fill brand-icon"></i>
+                <span>BWC-HDMS <small class="brand-version">v2.4</small></span>
+            </a>
+            
+            <div class="nav-actions">
+                <button class="theme-toggle-btn" id="darkModeToggle" title="Toggle Dark/Light Mode">
+                    <i class="bi bi-sun-fill" id="themeIcon"></i>
+                    <span id="themeText">Light</span>
+                </button>
+
+                <div class="user-dropdown-wrapper" id="userDropdownContainer">
+                    <button type="button" class="user-profile-btn" id="userDropdownToggle">
+                        <div class="user-avatar">
+                            <i class="bi bi-person-fill"></i>
+                        </div>
+                        <div class="user-meta">
+                            <span class="user-meta-name">Midwife Maria</span>
+                            <span class="user-meta-sub">BHS Purok 3 Station</span>
+                        </div>
+                        <i class="bi bi-chevron-down dropdown-chevron"></i>
+                    </button>
+                    <div class="dropdown-menu-custom hidden" id="userDropdownMenu">
+                        <a class="dropdown-item-custom" href="#" onclick="showNotification('Profile settings saved locally.', 'success')"><i class="bi bi-gear me-2"></i>Station Settings</a>
+                        <a class="dropdown-item-custom" href="#" onclick="exportSystemBackup()"><i class="bi bi-download me-2"></i>Quick Export DB</a>
+                        <div class="dropdown-divider-custom"></div>
+                        <a class="dropdown-item-custom dropdown-item-danger" href="#" onclick="lockStation()"><i class="bi bi-box-arrow-right me-2"></i>Lock Station</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Layout -->
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="sidebar">
+            <div>
+                <nav class="nav-menu">
+                    <a class="nav-link" href="dashboardPage.html">
+                        <i class="bi bi-speedometer2" style="font-size: 1.15rem;"></i><span>Dashboard</span>
+                    </a>
+                    <a class="nav-link active" href="patientsPage.html">
+                        <i class="bi bi-people" style="font-size: 1.15rem;"></i><span>Target Client Registry</span>
+                    </a>
+                    <a class="nav-link" href="vitalsPage.html">
+                        <i class="bi bi-clipboard2-pulse" style="font-size: 1.15rem;"></i><span>Consultation & Vitals</span>
+                    </a>
+                    <a class="nav-link" href="inventoryPage.html">
+                        <i class="bi bi-capsule" style="font-size: 1.15rem;"></i><span>Medicine Inventory</span>
+                    </a>
+                    <a class="nav-link" href="reportsPage.html">
+                        <i class="bi bi-file-earmark-bar-graph" style="font-size: 1.15rem;"></i><span>Reports & USB Backup</span>
+                    </a>
+                </nav>
+            </div>
+            <div class="sync-status-box">
+                <div class="sync-status-label">Sync Status</div>
+                <div class="sync-status-indicator">
+                    <i class="bi bi-cloud-check-fill"></i> <span>Local DB Up-to-date</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace: TCR Patients -->
+        <main class="main-content">
+            
+            <!-- Toast Alert System -->
+            <div class="toast-container">
+                <div id="liveToast" class="toast-pill toast-success hidden" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex align-center gap-2">
+                        <i class="bi bi-check-circle-fill" id="toastIcon"></i>
+                        <span id="toastMessage">Action completed successfully.</span>
+                    </div>
+                    <button type="button" class="toast-close-btn" onclick="hideToast()" aria-label="Close">&times;</button>
+                </div>
+            </div>
+
+            <!-- Page Title Bar -->
+            <div class="d-flex justify-between align-center mb-4" style="flex-wrap: wrap; gap: 0.75rem;">
+                <div>
+                    <h2 style="font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em;">Target Client Registry (TCR)</h2>
+                    <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.2rem;">Manage registered hypertensive and diabetic residents</p>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="openModal('patientModal')">
+                    <i class="bi bi-person-plus-fill me-1"></i> Register New Patient
+                </button>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="card-custom mb-4" style="padding: 1rem;">
+                <div class="grid-3-col">
+                    <div class="search-wrapper">
+                        <i class="bi bi-search search-icon-prefix"></i>
+                        <input type="text" class="form-control search-input-with-icon" id="searchTCR" placeholder="Search by name, purok, or PhilHealth No..." onkeyup="filterTCR()">
+                    </div>
+                    <div>
+                        <select class="form-select" id="filterCondition" onchange="filterTCR()">
+                            <option value="">All Conditions</option>
+                            <option value="Hypertension">Hypertension</option>
+                            <option value="Diabetes">Type 2 Diabetes</option>
+                            <option value="Both">Both (HPN & DM)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select class="form-select" id="filterPurok" onchange="filterTCR()">
+                            <option value="">All Puroks</option>
+                            <option value="Purok 1">Purok 1</option>
+                            <option value="Purok 2">Purok 2</option>
+                            <option value="Purok 3">Purok 3</option>
+                            <option value="Purok 4">Purok 4</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TCR Table Card -->
+            <div class="card-custom">
+                <div class="card-body-no-padding">
+                    <div class="table-responsive">
+                        <table class="custom-table" id="tcrTable">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">PhilHealth ID / Name</th>
+                                    <th>Age / Sex</th>
+                                    <th>Purok / Address</th>
+                                    <th>Condition</th>
+                                    <th>Last Visit</th>
+                                    <th>Risk Level</th>
+                                    <th class="text-right pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tcrTableBody">
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="fw-semibold">Juan Dela Cruz</div>
+                                        <small class="text-muted" style="font-size: 0.75rem;">PH: 12-345678901-2</small>
+                                    </td>
+                                    <td>54 / M</td>
+                                    <td>Purok 3, San Jose</td>
+                                    <td><span class="badge badge-danger-subtle">Hypertension</span></td>
+                                    <td>Oct 14, 2026</td>
+                                    <td><span class="badge badge-warning">Moderate</span></td>
+                                    <td class="text-right pe-4 space-x-1">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="openPatientRecord('Juan Dela Cruz')"><i class="bi bi-eye"></i></button>
+                                        <button class="btn btn-sm btn-outline-success" onclick="quickPrescribe('Juan Dela Cruz')"><i class="bi bi-capsule"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="fw-semibold">Maria Santos</div>
+                                        <small class="text-muted" style="font-size: 0.75rem;">PH: 14-987654321-9</small>
+                                    </td>
+                                    <td>61 / F</td>
+                                    <td>Purok 1, San Jose</td>
+                                    <td><span class="badge badge-primary-subtle">Type 2 Diabetes</span></td>
+                                    <td>Oct 14, 2026</td>
+                                    <td><span class="badge badge-danger">High Risk</span></td>
+                                    <td class="text-right pe-4 space-x-1">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="openPatientRecord('Maria Santos')"><i class="bi bi-eye"></i></button>
+                                        <button class="btn btn-sm btn-outline-success" onclick="quickPrescribe('Maria Santos')"><i class="bi bi-capsule"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Register New Patient Modal -->
+    <div class="modal-overlay hidden" id="patientModal" role="dialog" aria-modal="true">
+        <div class="modal-dialog-box modal-dialog-sm">
+            <div class="modal-header-custom" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title-custom">Register New Client in TCR</h5>
+                <button type="button" class="modal-close-btn" onclick="closeModal('patientModal')">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <form id="newPatientForm" onsubmit="savePatient(event)">
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="newPatientName" placeholder="e.g., Juan Dela Cruz" required>
+                    </div>
+                    <div class="grid-2-col mb-2">
+                        <div class="form-group mb-0">
+                            <label class="form-label">Age</label>
+                            <input type="number" class="form-control" id="newPatientAge" placeholder="45" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">Sex</label>
+                            <select class="form-select" id="newPatientSex">
+                                <option value="M">Male</option>
+                                <option value="F">Female</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid-2-col mb-2">
+                        <div class="form-group mb-0">
+                            <label class="form-label">Purok</label>
+                            <select class="form-select" id="newPatientPurok">
+                                <option value="Purok 1">Purok 1</option>
+                                <option value="Purok 2">Purok 2</option>
+                                <option value="Purok 3">Purok 3</option>
+                                <option value="Purok 4">Purok 4</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">Condition</label>
+                            <select class="form-select" id="newPatientCondition">
+                                <option value="Hypertension">Hypertension</option>
+                                <option value="Type 2 Diabetes">Type 2 Diabetes</option>
+                                <option value="Both">Both (HPN & DM)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group mb-4">
+                        <label class="form-label">PhilHealth ID No.</label>
+                        <input type="text" class="form-control" id="newPatientPH" placeholder="12-345678901-2" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full py-2 fw-semibold">Save to Registry</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="shared.js"></script>
+    <script src="patientsPage.js"></script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medicine Inventory | BWC-HDMS Portal</title>
+    <!-- Local Offline Assets -->
+    <link rel="stylesheet" href="icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="cssStyle.css">
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    <header class="header-navbar">
+        <div class="header-container">
+            <a class="brand-link" href="dashboardPage.html">
+                <i class="bi bi-heart-pulse-fill brand-icon"></i>
+                <span>BWC-HDMS <small class="brand-version">v2.4</small></span>
+            </a>
+            
+            <div class="nav-actions">
+                <button class="theme-toggle-btn" id="darkModeToggle" title="Toggle Dark/Light Mode">
+                    <i class="bi bi-sun-fill" id="themeIcon"></i>
+                    <span id="themeText">Light</span>
+                </button>
+
+                <div class="user-dropdown-wrapper" id="userDropdownContainer">
+                    <button type="button" class="user-profile-btn" id="userDropdownToggle">
+                        <div class="user-avatar">
+                            <i class="bi bi-person-fill"></i>
+                        </div>
+                        <div class="user-meta">
+                            <span class="user-meta-name">Midwife Maria</span>
+                            <span class="user-meta-sub">BHS Purok 3 Station</span>
+                        </div>
+                        <i class="bi bi-chevron-down dropdown-chevron"></i>
+                    </button>
+                    <div class="dropdown-menu-custom hidden" id="userDropdownMenu">
+                        <a class="dropdown-item-custom" href="#" onclick="showNotification('Profile settings saved locally.', 'success')"><i class="bi bi-gear me-2"></i>Station Settings</a>
+                        <a class="dropdown-item-custom" href="#" onclick="exportSystemBackup()"><i class="bi bi-download me-2"></i>Quick Export DB</a>
+                        <div class="dropdown-divider-custom"></div>
+                        <a class="dropdown-item-custom dropdown-item-danger" href="#" onclick="lockStation()"><i class="bi bi-box-arrow-right me-2"></i>Lock Station</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Layout -->
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="sidebar">
+            <div>
+                <nav class="nav-menu">
+                    <a class="nav-link" href="dashboardPage.html">
+                        <i class="bi bi-speedometer2" style="font-size: 1.15rem;"></i><span>Dashboard</span>
+                    </a>
+                    <a class="nav-link" href="patientsPage.html">
+                        <i class="bi bi-people" style="font-size: 1.15rem;"></i><span>Target Client Registry</span>
+                    </a>
+                    <a class="nav-link" href="vitalsPage.html">
+                        <i class="bi bi-clipboard2-pulse" style="font-size: 1.15rem;"></i><span>Consultation & Vitals</span>
+                    </a>
+                    <a class="nav-link active" href="inventoryPage.html">
+                        <i class="bi bi-capsule" style="font-size: 1.15rem;"></i><span>Medicine Inventory</span>
+                    </a>
+                    <a class="nav-link" href="reportsPage.html">
+                        <i class="bi bi-file-earmark-bar-graph" style="font-size: 1.15rem;"></i><span>Reports & USB Backup</span>
+                    </a>
+                </nav>
+            </div>
+            <div class="sync-status-box">
+                <div class="sync-status-label">Sync Status</div>
+                <div class="sync-status-indicator">
+                    <i class="bi bi-cloud-check-fill"></i> <span>Local DB Up-to-date</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace: Inventory -->
+        <main class="main-content">
+            
+            <!-- Toast Alert System -->
+            <div class="toast-container">
+                <div id="liveToast" class="toast-pill toast-success hidden" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex align-center gap-2">
+                        <i class="bi bi-check-circle-fill" id="toastIcon"></i>
+                        <span id="toastMessage">Action completed successfully.</span>
+                    </div>
+                    <button type="button" class="toast-close-btn" onclick="hideToast()" aria-label="Close">&times;</button>
+                </div>
+            </div>
+
+            <!-- Page Title Bar -->
+            <div class="d-flex justify-between align-center mb-4" style="flex-wrap: wrap; gap: 0.75rem;">
+                <div>
+                    <h2 style="font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em;">Medicine Inventory & Dispensing Ledger</h2>
+                    <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.2rem;">Track stock levels of maintenance anti-hypertensives and anti-diabetics</p>
+                </div>
+                <button class="btn btn-success btn-sm" onclick="requestRestock()">
+                    <i class="bi bi-plus-circle me-1"></i> Request RHU Restock
+                </button>
+            </div>
+
+            <!-- Inventory Table Card -->
+            <div class="card-custom">
+                <div class="card-body-no-padding">
+                    <div class="table-responsive">
+                        <table class="custom-table" id="inventoryTable">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Medicine Item</th>
+                                    <th>Category</th>
+                                    <th>Batch No.</th>
+                                    <th>Stock Balance</th>
+                                    <th>Status</th>
+                                    <th class="text-right pe-4">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="ps-4 fw-semibold">Losartan 50mg Tablet</td>
+                                    <td>Antihypertensive</td>
+                                    <td class="text-muted" style="font-family: monospace;">LOT-2026-A</td>
+                                    <td><span class="fw-bold text-danger">12 tabs</span></td>
+                                    <td><span class="badge badge-danger">Critical Low</span></td>
+                                    <td class="text-right pe-4">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="dispenseMed('Losartan 50mg')">Dispense</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4 fw-semibold">Metformin 500mg Tablet</td>
+                                    <td>Anti-diabetic</td>
+                                    <td class="text-muted" style="font-family: monospace;">LOT-2025-M</td>
+                                    <td><span class="fw-bold text-warning">28 tabs</span></td>
+                                    <td><span class="badge badge-warning">Low Stock</span></td>
+                                    <td class="text-right pe-4">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="dispenseMed('Metformin 500mg')">Dispense</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4 fw-semibold">Amlodipine 10mg Tablet</td>
+                                    <td>Antihypertensive</td>
+                                    <td class="text-muted" style="font-family: monospace;">LOT-2026-B</td>
+                                    <td><span class="fw-bold text-danger">5 tabs</span></td>
+                                    <td><span class="badge badge-danger">Critical Low</span></td>
+                                    <td class="text-right pe-4">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="dispenseMed('Amlodipine 10mg')">Dispense</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4 fw-semibold">Gliclazide 80mg Tablet</td>
+                                    <td>Anti-diabetic</td>
+                                    <td class="text-muted" style="font-family: monospace;">LOT-2026-G</td>
+                                    <td><span class="fw-bold text-success">145 tabs</span></td>
+                                    <td><span class="badge badge-success">Adequate</span></td>
+                                    <td class="text-right pe-4">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="dispenseMed('Gliclazide 80mg')">Dispense</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="shared.js"></script>
+    <script src="inventoryPage.js"></script>
+</body>
+</html>
