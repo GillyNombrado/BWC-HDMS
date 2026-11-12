@@ -8,59 +8,12 @@
 
 let stagedUploadFiles = [];
 
-// In-memory patient registry data storage
-const patientRegistryData = [
-    {
-        name: "Juan Mercado Dela Cruz",
-        firstName: "Juan",
-        middleName: "Mercado",
-        lastName: "Dela Cruz",
-        dob: "1972-04-12",
-        age: 54,
-        sex: "Male",
-        contact: "0917-555-1234",
-        purok: "Poblacion 3",
-        address: "House 14, Sitio Riverside, Poblacion 3",
-        condition: "Hypertension Only",
-        diagnosisDate: "2022-10-14",
-        ph: "12-345678901-2",
-        lastVisit: "Oct 14, 2026",
-        risk: "Moderate",
-        programs: ["Senior Citizen ID Holder"],
-        healthRisks: ["Smoking / Tobacco", "Family History of Stroke / CVD"],
-        allergies: "Sulfonamides, Aspirin",
-        medHistory: "Diagnosed with Stage 1 Hypertension in 2022. Maintenance Amlodipine 5mg OD. Hospitalized for dengue fever in 2018.",
-        emergencyName: "Juana Dela Cruz",
-        emergencyRel: "Spouse",
-        emergencyPhone: "0918-777-6543",
-        attachments: ["Senior_Citizen_ID_Scanned.pdf", "Prescription_Amlodipine_2026.jpg", "FBS_Lab_Result_Oct2026.pdf"]
-    },
-    {
-        name: "Maria Lopez Santos",
-        firstName: "Maria",
-        middleName: "Lopez",
-        lastName: "Santos",
-        dob: "1965-08-25",
-        age: 61,
-        sex: "Female",
-        contact: "0920-888-9911",
-        purok: "Poblacion 1",
-        address: "Block 3 Lot 8, Poblacion 1",
-        condition: "Diabetes Only",
-        diagnosisDate: "2019-05-18",
-        ph: "14-987654321-9",
-        lastVisit: "Oct 14, 2026",
-        risk: "High Risk",
-        programs: ["4Ps (Pantawid Pamilyang Pilipino Program)", "PWD (Persons with Disability)"],
-        healthRisks: ["Family History of Diabetes", "Physical Inactivity"],
-        allergies: "Penicillin, Cephalosporins",
-        medHistory: "Diagnosed with Type 2 Diabetes Mellitus in 2019. Experiences diabetic peripheral neuropathy in feet. Daily Metformin 500mg BID.",
-        emergencyName: "Pedro Santos",
-        emergencyRel: "Child",
-        emergencyPhone: "0919-222-3344",
-        attachments: ["PWD_ID_Card.png", "Blood_Glucose_Lab_Result.pdf", "Solo_Parent_ID.pdf"]
-    }
-];
+// Storage keys & Backend API URL
+const STORAGE_KEY_PATIENTS = 'bwc_patients_db';
+const BACKEND_PATIENTS_URL = 'http://127.0.0.1:5000/api/patients';
+
+// In-memory patient registry data storage (starts clean / empty)
+let patientRegistryData = [];
 
 // --------------------------------------------------------------------------
 // 1. Demographics & Date of Birth Age Auto-Calculation
@@ -290,41 +243,17 @@ function savePatient(e) {
         attachments: attachmentNames
     };
     patientRegistryData.unshift(patientRecord);
+    localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patientRegistryData));
+    renderTCRTable();
 
-    // Build badge pills for TCR table preview
-    let programBadges = '';
-    if (selectedPrograms.length > 0) {
-        const topPrograms = selectedPrograms.slice(0, 2);
-        programBadges = `<div class="mt-1 d-flex flex-wrap gap-1">` + 
-            topPrograms.map(p => `<span class="badge badge-primary-subtle" style="font-size: 0.65rem;">${p}</span>`).join('') +
-            (selectedPrograms.length > 2 ? `<span class="badge badge-warning" style="font-size: 0.65rem;">+${selectedPrograms.length - 2} more</span>` : '') +
-            `</div>`;
-    }
-
-    // Condition badge styling
-    let condBadgeClass = "badge-primary-subtle";
-    if (condition === "Hypertension Only") condBadgeClass = "badge-danger-subtle";
-    else if (condition === "Both") condBadgeClass = "badge-warning-subtle";
-
-    const tbody = document.getElementById('tcrTableBody');
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td class="ps-4">
-            <div class="fw-semibold">${fullName}</div>
-            <small class="text-muted" style="font-size: 0.75rem;">PH: ${ph}</small>
-            ${programBadges}
-        </td>
-        <td>${age} / ${sex.charAt(0)}</td>
-        <td>${purok}, San Jose</td>
-        <td><span class="badge ${condBadgeClass}">${condition}</span></td>
-        <td>Today</td>
-        <td><span class="badge ${riskBadgeClass}">${initialRisk}</span></td>
-        <td class="text-right pe-4 space-x-1">
-            <button class="btn btn-sm btn-outline-primary" onclick="openPatientRecord('${fullName.replace(/'/g, "\\'")}')" title="View Patient Profile"><i class="bi bi-eye"></i></button>
-            <button class="btn btn-sm btn-outline-success" onclick="quickPrescribe('${fullName.replace(/'/g, "\\'")}')" title="Consult / Prescribe"><i class="bi bi-capsule"></i></button>
-        </td>
-    `;
-    tbody.prepend(tr);
+    // Background asynchronous sync to Flask / SQLite backend
+    try {
+        fetch(BACKEND_PATIENTS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patientRecord)
+        }).catch(() => {});
+    } catch (e) {}
 
     // Reset Form & Clear UI Upload States
     closeModal('patientModal');
@@ -520,3 +449,141 @@ function quickPrescribe(patientName) {
         window.location.href = 'vitalsPage.html';
     }, 400);
 }
+
+// --------------------------------------------------------------------------
+// 8. Dynamic TCR Table Rendering & Clean Empty State Handling
+// --------------------------------------------------------------------------
+function renderTCRTable() {
+    const tbody = document.getElementById('tcrTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (patientRegistryData.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-5 text-muted">
+                    <i class="bi bi-people d-block mb-2" style="font-size: 2rem; opacity: 0.5;"></i>
+                    <span class="fw-semibold" style="font-size: 0.95rem;">No registered clients found in Target Client Registry (TCR).</span>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem; margin-top: 0.25rem;">Click "Register New Client in TCR" above to enroll a resident.</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    patientRegistryData.forEach(p => {
+        let programBadges = '';
+        if (p.programs && p.programs.length > 0) {
+            const topPrograms = p.programs.slice(0, 2);
+            programBadges = `<div class="mt-1 d-flex flex-wrap gap-1">` + 
+                topPrograms.map(prog => `<span class="badge badge-primary-subtle" style="font-size: 0.65rem;">${escapeHtml(prog)}</span>`).join('') +
+                (p.programs.length > 2 ? `<span class="badge badge-warning" style="font-size: 0.65rem;">+${p.programs.length - 2} more</span>` : '') +
+                `</div>`;
+        }
+
+        let condBadgeClass = "badge-primary-subtle";
+        if (p.condition === "Hypertension Only") condBadgeClass = "badge-danger-subtle";
+        else if (p.condition === "Both") condBadgeClass = "badge-warning-subtle";
+
+        let riskBadgeClass = "badge-success";
+        if (p.risk === "High Risk") riskBadgeClass = "badge-danger";
+        else if (p.risk === "Moderate") riskBadgeClass = "badge-warning";
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="ps-4">
+                <div class="fw-semibold">${escapeHtml(p.name)}</div>
+                <small class="text-muted" style="font-size: 0.75rem;">PH: ${escapeHtml(p.ph || 'N/A')}</small>
+                ${programBadges}
+            </td>
+            <td>${p.age || '--'} / ${p.sex ? p.sex.charAt(0) : '--'}</td>
+            <td>${escapeHtml(p.purok || 'San Jose')}, San Jose</td>
+            <td><span class="badge ${condBadgeClass}">${escapeHtml(p.condition || 'General')}</span></td>
+            <td>${escapeHtml(p.lastVisit || 'Today')}</td>
+            <td><span class="badge ${riskBadgeClass}">${escapeHtml(p.risk || 'Stable')}</span></td>
+            <td class="text-right pe-4 space-x-1">
+                <button class="btn btn-sm btn-outline-primary" onclick="openPatientRecord('${escapeHtml(p.name).replace(/'/g, "\\'")}')" title="View Patient Profile"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-success" onclick="quickPrescribe('${escapeHtml(p.name).replace(/'/g, "\\'")}')" title="Consult / Prescribe"><i class="bi bi-capsule"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// --------------------------------------------------------------------------
+// 9. Data Loading & Initialization
+// --------------------------------------------------------------------------
+async function loadPatients() {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+        const res = await fetch(BACKEND_PATIENTS_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                patientRegistryData = json.data.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    firstName: p.first_name,
+                    middleName: p.middle_name,
+                    lastName: p.last_name,
+                    dob: p.dob,
+                    age: p.age,
+                    sex: p.sex,
+                    contact: p.contact,
+                    purok: p.purok,
+                    address: p.address,
+                    condition: p.condition,
+                    diagnosisDate: p.diagnosis_date,
+                    ph: p.ph_id,
+                    lastVisit: p.last_visit || 'Never',
+                    risk: p.risk_level || 'Moderate',
+                    programs: [],
+                    healthRisks: [],
+                    allergies: '',
+                    medHistory: '',
+                    emergencyName: '',
+                    emergencyRel: '',
+                    emergencyPhone: '',
+                    attachments: []
+                }));
+                localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patientRegistryData));
+                renderTCRTable();
+                return;
+            }
+        }
+    } catch (e) {
+        // Fallback to offline local storage
+    }
+
+    const raw = localStorage.getItem(STORAGE_KEY_PATIENTS);
+    if (raw) {
+        try {
+            patientRegistryData = JSON.parse(raw);
+        } catch (e) {
+            patientRegistryData = [];
+        }
+    } else {
+        patientRegistryData = [];
+    }
+
+    renderTCRTable();
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadPatients();
+});

@@ -62,117 +62,18 @@ function initLiveServerClock() {
 }
 
 // --------------------------------------------------------------------------
-// 2. Initial Baseline Seed Data (Offline / Local Demonstration Mode)
+// 2. Initial Schedule Data Layer (Clean Zero State)
 // --------------------------------------------------------------------------
 function getInitialSeedAppointments() {
-    const today = new Date();
-    
-    // Helper to generate ISO date strings relative to today (YYYY-MM-DD)
-    const offsetDate = (days) => {
-        const d = new Date(today);
-        d.setDate(today.getDate() + days);
-        return d.toISOString().split('T')[0];
-    };
-
-    return [
-        {
-            id: 1,
-            patientName: "Juan Mercado Dela Cruz",
-            category: "Monthly HPN Check",
-            scheduledDate: offsetDate(0), // Due Today
-            purok: "Poblacion 3",
-            remarks: "Routine 30-day BP reassessment and Amlodipine 5mg refill.",
-            status: "Pending",
-            completedDate: null
-        },
-        {
-            id: 2,
-            patientName: "Maria Lopez Santos",
-            category: "Diabetes Follow-up",
-            scheduledDate: offsetDate(0), // Due Today
-            purok: "Poblacion 1",
-            remarks: "Fasting Blood Sugar (FBS) monitoring and Metformin 500mg review.",
-            status: "Pending",
-            completedDate: null
-        },
-        {
-            id: 3,
-            patientName: "Pedro Alvarez Penduko",
-            category: "Monthly HPN Check",
-            scheduledDate: offsetDate(-14), // 14 days ago -> Defaulted
-            purok: "Poblacion 2",
-            remarks: "Missed scheduled monthly follow-up. BHW house-to-house check needed.",
-            status: "Defaulted",
-            completedDate: null
-        },
-        {
-            id: 4,
-            patientName: "Lorna Bautista Ramos",
-            category: "Medicine Refill",
-            scheduledDate: offsetDate(-5), // 5 days ago -> Defaulted
-            purok: "Poblacion 1",
-            remarks: "Maintenance Losartan 50mg dispensing was defaulted.",
-            status: "Defaulted",
-            completedDate: null
-        },
-        {
-            id: 5,
-            patientName: "Elena Gomez Cruz",
-            category: "Monthly HPN Check",
-            scheduledDate: offsetDate(-7), // Completed last week
-            purok: "Poblacion 2",
-            remarks: "BP recorded: 125/80 mmHg. Medication compliance verified.",
-            status: "Completed",
-            completedDate: offsetDate(-7)
-        },
-        {
-            id: 6,
-            patientName: "Barangay Residents - Purok 1",
-            category: "Purok Assembly",
-            scheduledDate: offsetDate(-10),
-            purok: "Poblacion 1",
-            remarks: "Barangay Health Station orientation on low-sodium dietary guidelines.",
-            status: "Completed",
-            completedDate: offsetDate(-10)
-        },
-        {
-            id: 7,
-            patientName: "Barangay Residents - Purok 2",
-            category: "Purok Assembly",
-            scheduledDate: offsetDate(3), // Upcoming
-            purok: "Poblacion 2",
-            remarks: "Community Diabetes Awareness & Free RBS Screening at Purok Covered Court.",
-            status: "Pending",
-            completedDate: null
-        },
-        {
-            id: 8,
-            patientName: "Rosa Mercado",
-            category: "Medicine Refill",
-            scheduledDate: offsetDate(12), // Upcoming
-            purok: "Poblacion 3",
-            remarks: "Monthly maintenance supply: Losartan 50mg & Metformin 500mg.",
-            status: "Pending",
-            completedDate: null
-        },
-        {
-            id: 9,
-            patientName: "Danilo Flores",
-            category: "Monthly HPN Check",
-            scheduledDate: offsetDate(25), // Upcoming
-            purok: "Poblacion 1",
-            remarks: "Post-hypertension medication titration check-up.",
-            status: "Pending",
-            completedDate: null
-        }
-    ];
+    // Pristine empty array for clean database imports and live testing
+    return [];
 }
 
 // --------------------------------------------------------------------------
-// 3. Data Synchronization & Persistence Layer
+// 3. Data Synchronization & Persistence Layer (Starts Clean / Empty State)
 // --------------------------------------------------------------------------
 /**
- * Loads appointments from localStorage or initializes seeds.
+ * Loads appointments from localStorage.
  * Automatically checks and flags overdue 'Pending' appointments as 'Defaulted'.
  */
 function loadAppointmentsFromStorage() {
@@ -587,6 +488,27 @@ function openScheduleModal() {
 
     const form = document.getElementById('newScheduleForm');
     if (form) form.reset();
+
+    // Populate patient suggestions dynamically from TCR storage
+    const datalist = document.getElementById('patientSuggestions');
+    if (datalist) {
+        datalist.innerHTML = `
+            <option value="Barangay Residents - Purok 1">
+            <option value="Barangay Residents - Purok 2">
+            <option value="Barangay Residents - Purok 3">
+        `;
+        try {
+            const raw = localStorage.getItem('bwc_patients_db');
+            if (raw) {
+                const patients = JSON.parse(raw);
+                patients.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.name;
+                    datalist.appendChild(opt);
+                });
+            }
+        } catch (e) {}
+    }
 
     // Default scheduled date to tomorrow
     const tomorrow = new Date();

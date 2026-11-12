@@ -131,23 +131,23 @@
             <div class="stat-cards-grid">
                 <div class="stat-card stat-card-blue">
                     <div class="stat-card-title">Active TCR Patients</div>
-                    <div class="stat-card-value text-primary" id="statActive">148</div>
-                    <div class="stat-card-desc text-success"><i class="bi bi-arrow-up-short" style="font-size: 1.1rem;"></i> +4 new this week</div>
+                    <div class="stat-card-value text-primary" id="statActive">0</div>
+                    <div class="stat-card-desc text-muted"><i class="bi bi-people" style="font-size: 1.1rem;"></i> Total registered</div>
                 </div>
                 <div class="stat-card stat-card-red">
                     <div class="stat-card-title">Due Today Follow-ups</div>
-                    <div class="stat-card-value text-danger" id="statDueToday">12</div>
+                    <div class="stat-card-value text-danger" id="statDueToday">0</div>
                     <div class="stat-card-desc text-danger">Requires consultation</div>
                 </div>
                 <div class="stat-card stat-card-yellow">
                     <div class="stat-card-title">Overdue / Defaulted</div>
-                    <div class="stat-card-value text-warning" id="statOverdue">7</div>
+                    <div class="stat-card-value text-warning" id="statOverdue">0</div>
                     <div class="stat-card-desc text-muted">Missed monthly visit</div>
                 </div>
                 <div class="stat-card stat-card-green">
                     <div class="stat-card-title">Low-Stock Medicines</div>
-                    <div class="stat-card-value text-success" id="statLowStock">3</div>
-                    <div class="stat-card-desc text-danger">Action required</div>
+                    <div class="stat-card-value text-success" id="statLowStock">0</div>
+                    <div class="stat-card-desc text-muted">Stock monitoring</div>
                 </div>
             </div>
 
@@ -173,25 +173,10 @@
                                 </thead>
                                 <tbody id="recentConsultTable">
                                     <tr>
-                                        <td class="ps-4 fw-semibold">Juan Dela Cruz</td>
-                                        <td><span class="badge badge-danger-subtle">Hypertension</span></td>
-                                        <td>140/90 mmHg</td>
-                                        <td><span class="badge badge-warning">Controlled</span></td>
-                                        <td class="text-right pe-4 text-muted" style="font-size: 0.75rem;">Oct 14, 2026</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="ps-4 fw-semibold">Maria Santos</td>
-                                        <td><span class="badge badge-primary-subtle">Type 2 Diabetes</span></td>
-                                        <td>180 mg/dL (FBS)</td>
-                                        <td><span class="badge badge-danger">High Risk</span></td>
-                                        <td class="text-right pe-4 text-muted" style="font-size: 0.75rem;">Oct 14, 2026</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="ps-4 fw-semibold">Pedro Penduko</td>
-                                        <td><span class="badge badge-danger-subtle">Hypertension</span></td>
-                                        <td>130/85 mmHg</td>
-                                        <td><span class="badge badge-success">Stable</span></td>
-                                        <td class="text-right pe-4 text-muted" style="font-size: 0.75rem;">Oct 13, 2026</td>
+                                        <td colspan="5" class="text-center py-4 text-muted">
+                                            <i class="bi bi-clipboard2-x d-block mb-1" style="font-size: 1.5rem; opacity: 0.5;"></i>
+                                            <span>No recent consultations recorded yet.</span>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -204,33 +189,10 @@
                     <div class="card-header-custom">
                         <h5 class="card-header-title">Critical Inventory Alert</h5>
                     </div>
-                    <div class="card-body-custom d-flex flex-column justify-between gap-3">
-                        <div style="padding: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-surface-secondary);">
-                            <div class="d-flex justify-between align-center mb-1">
-                                <span class="fw-semibold" style="font-size: 0.8rem;">Losartan 50mg</span>
-                                <span class="badge badge-danger">12 tabs left</span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill bg-fill-danger" style="width: 10%;"></div>
-                            </div>
-                        </div>
-                        <div style="padding: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-surface-secondary);">
-                            <div class="d-flex justify-between align-center mb-1">
-                                <span class="fw-semibold" style="font-size: 0.8rem;">Metformin 500mg</span>
-                                <span class="badge badge-warning">28 tabs left</span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill bg-fill-warning" style="width: 25%;"></div>
-                            </div>
-                        </div>
-                        <div style="padding: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-surface-secondary);">
-                            <div class="d-flex justify-between align-center mb-1">
-                                <span class="fw-semibold" style="font-size: 0.8rem;">Amlodipine 10mg</span>
-                                <span class="badge badge-danger">5 tabs left</span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill bg-fill-danger" style="width: 5%;"></div>
-                            </div>
+                    <div class="card-body-custom d-flex flex-column justify-between gap-3" id="criticalInventoryAlerts">
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-shield-check d-block mb-1" style="font-size: 1.5rem; opacity: 0.5;"></i>
+                            <span>No critical stock alerts. All supplies adequate or unseeded.</span>
                         </div>
                     </div>
                 </div>

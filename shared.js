@@ -160,6 +160,17 @@ function exportSystemBackup() {
     showNotification('Encrypted backup archive (.enc) successfully generated for RHU submission.', 'success');
 }
 
+function resetLocalDatabase() {
+    localStorage.removeItem('bwc_appointments_db');
+    localStorage.removeItem('bwc_patients_db');
+    localStorage.removeItem('bwc_consultations_db');
+    localStorage.removeItem('bwc_inventory_db');
+    showNotification('Local database state cleared to zero.', 'success');
+    setTimeout(() => {
+        window.location.reload();
+    }, 400);
+}
+
 // --------------------------------------------------------------------------
 // 6. Global Initialization
 // --------------------------------------------------------------------------

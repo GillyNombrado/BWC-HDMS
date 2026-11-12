@@ -7,6 +7,7 @@ Backend Server: Python / Flask with Embedded SQLite Database
 This module provides the local offline RESTful API and static web server for
 the BWC-HDMS portal. It handles data persistence for Target Client Registry
 (TCR), Consultations, Medicine Inventory, and the Monthly Schedule System.
+==============================================================================
 """
 
 import os
@@ -59,10 +60,10 @@ def execute_db(query, args=()):
 
 
 # --------------------------------------------------------------------------
-# Database Initialization & Schema Definition
+# Database Initialization (Schema Only - Clean Zero State)
 # --------------------------------------------------------------------------
 def init_db():
-    """Initializes tables and seeds baseline sample data if database is new."""
+    """Initializes tables cleanly without injecting mock or seed data."""
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
@@ -127,84 +128,20 @@ def init_db():
         CREATE TABLE IF NOT EXISTS inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             item_name TEXT NOT NULL,
+            category TEXT DEFAULT 'Antihypertensive',
+            batch_no TEXT,
             dosage TEXT,
             current_stock INTEGER DEFAULT 0,
             unit TEXT DEFAULT 'tabs',
             reorder_level INTEGER DEFAULT 20,
-            status TEXT DEFAULT 'In Stock'
+            status TEXT DEFAULT 'Adequate',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
     conn.commit()
-
-    # Seed initial demo data if tables are empty
-    cursor.execute("SELECT COUNT(*) FROM patients")
-    if cursor.fetchone()[0] == 0:
-        seed_sample_data(cursor, conn)
-
     conn.close()
-
-
-def seed_sample_data(cursor, conn):
-    """Populates baseline demonstration records for Capstone presentation."""
-    today = date.today()
-    today_str = today.isoformat()
-
-    # Sample Patients
-    patients = [
-        ("Juan Mercado Dela Cruz", "Juan", "Mercado", "Dela Cruz", "1972-04-12", 54, "Male", "0917-555-1234", "Poblacion 3", "House 14, Sitio Riverside", "Hypertension Only", "2022-10-14", "12-345678901-2", "2026-10-14", "Moderate"),
-        ("Maria Lopez Santos", "Maria", "Lopez", "Santos", "1965-08-25", 61, "Female", "0920-888-9911", "Poblacion 1", "Block 3 Lot 8, Poblacion 1", "Diabetes Only", "2019-05-18", "14-987654321-9", "2026-10-14", "High Risk"),
-        ("Pedro Penduko", "Pedro", "Alvarez", "Penduko", "1958-01-15", 68, "Male", "0918-333-4455", "Poblacion 2", "Zone 4, Poblacion 2", "Both", "2020-03-10", "15-112233445-0", "2026-10-13", "Controlled"),
-    ]
-    cursor.executemany("""
-        INSERT INTO patients (name, first_name, middle_name, last_name, dob, age, sex, contact, purok, address, condition, diagnosis_date, ph_id, last_visit, risk_level)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, patients)
-
-    # Sample Appointments (covering categories & statuses: Due Today, Defaulted, Pending, Completed)
-    past_date_1 = (today - timedelta(days=12)).isoformat()
-    past_date_2 = (today - timedelta(days=5)).isoformat()
-    past_date_3 = (today - timedelta(days=1)).isoformat()
-    future_date_1 = (today + timedelta(days=3)).isoformat()
-    future_date_2 = (today + timedelta(days=14)).isoformat()
-    future_date_3 = (today + timedelta(days=28)).isoformat()
-
-    appointments = [
-        # Due Today (Pending)
-        ("Juan Mercado Dela Cruz", "Monthly HPN Check", today_str, "Poblacion 3", "Routine 30-day BP reassessment and Amlodipine refill.", "Pending"),
-        ("Maria Lopez Santos", "Diabetes Follow-up", today_str, "Poblacion 1", "Fasting blood sugar (FBS) monitoring and Metformin review.", "Pending"),
-        
-        # Defaulted (Missed past appointments)
-        ("Pedro Penduko", "Monthly HPN Check", past_date_1, "Poblacion 2", "Missed scheduled monthly follow-up. BHW home visit required.", "Defaulted"),
-        ("Lorna Bautista Ramos", "Medicine Refill", past_date_2, "Poblacion 1", "Scheduled Losartan 50mg maintenance pickup defaulted.", "Defaulted"),
-        ("Antonio Morales", "Diabetes Follow-up", past_date_3, "Poblacion 3", "Missed 30-day glucose re-check.", "Defaulted"),
-        
-        # Completed
-        ("Elena Gomez Cruz", "Monthly HPN Check", past_date_2, "Poblacion 2", "BP recorded: 125/80 mmHg. Medication compliance confirmed.", "Completed"),
-        ("Barangay Residents - Purok 1", "Purok Assembly", past_date_1, "Poblacion 1", "Community Cardiovascular Health Education & Blood Pressure Screening.", "Completed"),
-        
-        # Upcoming Future Events
-        ("Barangay Residents - Purok 2", "Purok Assembly", future_date_1, "Poblacion 2", "Monthly Community Diabetes Awareness & Free RBS Screening at Covered Court.", "Pending"),
-        ("Rosa Mercado", "Medicine Refill", future_date_2, "Poblacion 3", "Maintenance Losartan 50mg and Metformin 500mg dispensing.", "Pending"),
-        ("Danilo Flores", "Monthly HPN Check", future_date_3, "Poblacion 1", "Post-medication adjustment check-up.", "Pending"),
-    ]
-    cursor.executemany("""
-        INSERT INTO appointments (patient_name, category, scheduled_date, purok, remarks, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, appointments)
-
-    # Sample Inventory
-    inventory = [
-        ("Amlodipine 5mg", "5mg", 140, "tabs", 30, "In Stock"),
-        ("Losartan 50mg", "50mg", 12, "tabs", 20, "Low Stock"),
-        ("Metformin 500mg", "500mg", 220, "tabs", 50, "In Stock"),
-    ]
-    cursor.executemany("""
-        INSERT INTO inventory (item_name, dosage, current_stock, unit, reorder_level, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, inventory)
-
-    conn.commit()
+    print("[DB] SQLite database schema initialized (clean zero-state). Ready for live transactions.")
 
 
 # --------------------------------------------------------------------------
@@ -407,7 +344,7 @@ def get_dashboard_stats():
     """, one=True)
     overdue_count = res_overdue["count"] if res_overdue else 0
 
-    # Low Stock Medicines
+    # Low Stock Medicines (current_stock <= reorder_level)
     res_stock = query_db("""
         SELECT COUNT(*) AS count FROM inventory
         WHERE current_stock <= reorder_level
@@ -489,6 +426,130 @@ def record_consultation():
 
 
 # --------------------------------------------------------------------------
+# RESTful API Endpoints - Patients (Target Client Registry)
+# --------------------------------------------------------------------------
+@app.route("/api/patients", methods=["GET"])
+def get_patients():
+    """Retrieves all registered TCR patients from SQLite."""
+    patients = query_db("SELECT * FROM patients ORDER BY id DESC")
+    return jsonify({"success": True, "count": len(patients), "data": patients})
+
+
+@app.route("/api/patients", methods=["POST"])
+def register_patient():
+    """Registers a new patient into the TCR table."""
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"success": False, "error": "Patient name is required"}), 400
+
+    patient_id = execute_db("""
+        INSERT INTO patients (name, first_name, middle_name, last_name, dob, age, sex, contact, purok, address, condition, diagnosis_date, ph_id, last_visit, risk_level)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        name,
+        data.get("firstName", ""),
+        data.get("middleName", ""),
+        data.get("lastName", ""),
+        data.get("dob", ""),
+        data.get("age", 0),
+        data.get("sex", "Male"),
+        data.get("contact", ""),
+        data.get("purok", "Poblacion 1"),
+        data.get("address", ""),
+        data.get("condition", "Hypertension Only"),
+        data.get("diagnosisDate", date.today().isoformat()),
+        data.get("ph", ""),
+        data.get("lastVisit", "Today"),
+        data.get("risk", "Moderate")
+    ))
+    new_patient = query_db("SELECT * FROM patients WHERE id = ?", (patient_id,), one=True)
+    return jsonify({"success": True, "message": "Patient registered successfully", "data": new_patient}), 201
+
+
+# --------------------------------------------------------------------------
+# RESTful API Endpoints - Inventory
+# --------------------------------------------------------------------------
+@app.route("/api/inventory", methods=["GET"])
+def get_inventory():
+    """Retrieves all medicine inventory stock items."""
+    items = query_db("SELECT * FROM inventory ORDER BY item_name ASC")
+    return jsonify({"success": True, "count": len(items), "data": items})
+
+
+@app.route("/api/inventory", methods=["POST"])
+def add_inventory_item():
+    """Adds a new medicine item to inventory."""
+    data = request.get_json() or {}
+    item_name = data.get("item_name", "").strip()
+    category = data.get("category", "Antihypertensive").strip()
+    batch_no = data.get("batch_no", "").strip()
+    dosage = data.get("dosage", "").strip()
+    current_stock = int(data.get("current_stock", 0))
+    reorder_level = int(data.get("reorder_level", 20))
+    unit = data.get("unit", "tabs").strip()
+
+    if not item_name:
+        return jsonify({"success": False, "error": "Medicine item name is required"}), 400
+
+    status = "Adequate"
+    if current_stock <= 10:
+        status = "Critical Low"
+    elif current_stock <= reorder_level:
+        status = "Low Stock"
+
+    item_id = execute_db("""
+        INSERT INTO inventory (item_name, category, batch_no, dosage, current_stock, unit, reorder_level, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (item_name, category, batch_no, dosage, current_stock, unit, reorder_level, status))
+
+    new_item = query_db("SELECT * FROM inventory WHERE id = ?", (item_id,), one=True)
+    return jsonify({"success": True, "message": "Medicine added successfully", "data": new_item}), 201
+
+
+@app.route("/api/inventory/<int:item_id>/dispense", methods=["POST"])
+def dispense_inventory_item(item_id):
+    """Dispenses medicine quantity from inventory and updates status."""
+    data = request.get_json() or {}
+    qty = int(data.get("quantity", 30))
+
+    item = query_db("SELECT * FROM inventory WHERE id = ?", (item_id,), one=True)
+    if not item:
+        return jsonify({"success": False, "error": "Item not found"}), 404
+
+    current_stock = max(0, item["current_stock"] - qty)
+    reorder_level = item["reorder_level"]
+
+    status = "Adequate"
+    if current_stock <= 10:
+        status = "Critical Low"
+    elif current_stock <= reorder_level:
+        status = "Low Stock"
+
+    execute_db("""
+        UPDATE inventory
+        SET current_stock = ?, status = ?
+        WHERE id = ?
+    """, (current_stock, status, item_id))
+
+    updated = query_db("SELECT * FROM inventory WHERE id = ?", (item_id,), one=True)
+    return jsonify({"success": True, "message": f"Dispensed {qty} {item['unit']}.", "data": updated})
+
+
+# --------------------------------------------------------------------------
+# Administrative Reset Endpoint
+# --------------------------------------------------------------------------
+@app.route("/api/admin/reset", methods=["POST"])
+def reset_database():
+    """Wipes all transactional records to return database to clean zero-state."""
+    execute_db("DELETE FROM appointments")
+    execute_db("DELETE FROM consultations")
+    execute_db("DELETE FROM patients")
+    execute_db("DELETE FROM inventory")
+    return jsonify({"success": True, "message": "Database successfully reset to clean zero-state."})
+
+
+# --------------------------------------------------------------------------
 # Main Execution
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
@@ -498,4 +559,3 @@ if __name__ == "__main__":
     print(" Access URL: http://127.0.0.1:5000/dashboardPage.html")
     print("=" * 70)
     app.run(host="127.0.0.1", port=5000, debug=True)
-

@@ -13,14 +13,16 @@
 
 const STORAGE_KEY_APPOINTMENTS = 'bwc_appointments_db';
 const BACKEND_CONSULT_URL = 'http://127.0.0.1:5000/api/consultations';
+const BACKEND_PATIENTS_URL = 'http://127.0.0.1:5000/api/patients';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await populateRegisteredPatients();
+
     // If a patient was selected via "quickPrescribe" from TCR or Schedule, auto-select them
     const preselected = sessionStorage.getItem('consult_patient');
     if (preselected) {
         const select = document.getElementById('consultPatient');
         if (select) {
-            // Check if exact value exists; if not, find partial match
             let matched = false;
             for (let option of select.options) {
                 if (option.value === preselected || option.value.toLowerCase().includes(preselected.toLowerCase()) || preselected.toLowerCase().includes(option.value.toLowerCase())) {
@@ -30,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             if (!matched) {
-                // Add dynamically if not present
                 const newOpt = new Option(preselected, preselected, true, true);
                 select.add(newOpt);
             }
@@ -39,6 +40,58 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionStorage.removeItem('consult_patient');
     }
 });
+
+// Populate registered patient dropdown dynamically from DB or local state
+async function populateRegisteredPatients() {
+    const select = document.getElementById('consultPatient');
+    if (!select) return;
+
+    let patients = [];
+
+    // Attempt backend fetch
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const res = await fetch(BACKEND_PATIENTS_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.success && Array.isArray(data.data)) {
+                patients = data.data;
+            }
+        }
+    } catch (e) {
+        // Fallback to local storage
+    }
+
+    if (patients.length === 0) {
+        try {
+            const raw = localStorage.getItem('bwc_patients_db');
+            if (raw) patients = JSON.parse(raw);
+        } catch (e) {
+            patients = [];
+        }
+    }
+
+    // Clear previous options except default
+    select.innerHTML = '<option value="">Choose registered patient...</option>';
+
+    if (patients.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.disabled = true;
+        opt.textContent = 'No registered clients in TCR — please register a patient first';
+        select.appendChild(opt);
+        return;
+    }
+
+    patients.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = `${p.name} (${p.condition || 'General Intake'})`;
+        select.appendChild(opt);
+    });
+}
 
 // Calculate BMI & Status
 function calculateBMI() {

@@ -101,9 +101,14 @@
                     <h2 style="font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em;">Medicine Inventory & Dispensing Ledger</h2>
                     <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.2rem;">Track stock levels of maintenance anti-hypertensives and anti-diabetics</p>
                 </div>
-                <button class="btn btn-success btn-sm" onclick="requestRestock()">
-                    <i class="bi bi-plus-circle me-1"></i> Request RHU Restock
-                </button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary btn-sm" onclick="openAddMedicineModal()">
+                        <i class="bi bi-plus-lg me-1"></i> Add Medicine Supply
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="requestRestock()">
+                        <i class="bi bi-arrow-repeat me-1"></i> Request RHU Restock
+                    </button>
+                </div>
             </div>
 
             <!-- Inventory Table Card -->
@@ -121,45 +126,12 @@
                                     <th class="text-right pe-4">Action</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="inventoryTableBody">
                                 <tr>
-                                    <td class="ps-4 fw-semibold">Losartan 50mg Tablet</td>
-                                    <td>Antihypertensive</td>
-                                    <td class="text-muted" style="font-family: monospace;">LOT-2026-A</td>
-                                    <td><span class="fw-bold text-danger">12 tabs</span></td>
-                                    <td><span class="badge badge-danger">Critical Low</span></td>
-                                    <td class="text-right pe-4">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="dispenseMed('Losartan 50mg')">Dispense</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4 fw-semibold">Metformin 500mg Tablet</td>
-                                    <td>Anti-diabetic</td>
-                                    <td class="text-muted" style="font-family: monospace;">LOT-2025-M</td>
-                                    <td><span class="fw-bold text-warning">28 tabs</span></td>
-                                    <td><span class="badge badge-warning">Low Stock</span></td>
-                                    <td class="text-right pe-4">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="dispenseMed('Metformin 500mg')">Dispense</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4 fw-semibold">Amlodipine 10mg Tablet</td>
-                                    <td>Antihypertensive</td>
-                                    <td class="text-muted" style="font-family: monospace;">LOT-2026-B</td>
-                                    <td><span class="fw-bold text-danger">5 tabs</span></td>
-                                    <td><span class="badge badge-danger">Critical Low</span></td>
-                                    <td class="text-right pe-4">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="dispenseMed('Amlodipine 10mg')">Dispense</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4 fw-semibold">Gliclazide 80mg Tablet</td>
-                                    <td>Anti-diabetic</td>
-                                    <td class="text-muted" style="font-family: monospace;">LOT-2026-G</td>
-                                    <td><span class="fw-bold text-success">145 tabs</span></td>
-                                    <td><span class="badge badge-success">Adequate</span></td>
-                                    <td class="text-right pe-4">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="dispenseMed('Gliclazide 80mg')">Dispense</button>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        <i class="bi bi-capsule d-block mb-2" style="font-size: 2rem; opacity: 0.5;"></i>
+                                        <span class="fw-semibold" style="font-size: 0.95rem;">No medicine stock records found in inventory.</span>
+                                        <p class="text-muted mb-0" style="font-size: 0.8rem; margin-top: 0.25rem;">Medicine inventory will populate once records are synced from the RHU or logged into the system.</p>
                                     </td>
                                 </tr>
                             </tbody>
@@ -167,6 +139,68 @@
                     </div>
                 </div>
             </div>
+
+        </main>
+    </div>
+
+    <!-- =========================================================================
+         Add Medicine Stock Modal
+         ========================================================================= -->
+    <div class="modal-backdrop-custom hidden" id="addMedicineModal">
+        <div class="modal-dialog-box modal-dialog-md">
+            <div class="modal-header-custom">
+                <div>
+                    <h5 class="modal-title-custom">
+                        <i class="bi bi-capsule-pill text-primary me-2"></i>Add Medicine Supply
+                    </h5>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">Register incoming maintenance medicine stock</p>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeAddMedicineModal()">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <form id="addMedicineForm" onsubmit="saveMedicineItem(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="medName">Medicine Name & Formulation <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="medName" placeholder="e.g. Losartan 50mg Tablet" required>
+                    </div>
+
+                    <div class="grid-2-col mb-2">
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="medCategory">Category <span class="text-danger">*</span></label>
+                            <select class="form-select" id="medCategory" required>
+                                <option value="Antihypertensive">Antihypertensive</option>
+                                <option value="Anti-diabetic">Anti-diabetic</option>
+                                <option value="Statin / Lipid-lowering">Statin / Lipid-lowering</option>
+                                <option value="Emergency Supply">Emergency Supply</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="medBatch">Batch / Lot Number</label>
+                            <input type="text" class="form-control" id="medBatch" placeholder="e.g. LOT-2026-A">
+                        </div>
+                    </div>
+
+                    <div class="grid-2-col mb-4">
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="medStock">Initial Stock Quantity <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="medStock" placeholder="e.g. 100" min="0" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="medReorder">Reorder Threshold Level</label>
+                            <input type="number" class="form-control" id="medReorder" value="20" min="1">
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary py-2" style="flex: 1;" onclick="closeAddMedicineModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary py-2" style="flex: 2;">
+                            <i class="bi bi-save me-1"></i> Save Medicine Item
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
         </main>
     </div>
