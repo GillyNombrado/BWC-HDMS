@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Schedule | BWC-HDMS Portal</title>
+    <link rel="icon" type="image/png" href="icons/Logo.png">
     <!-- Local Offline Assets -->
     <link rel="stylesheet" href="icons/bootstrap-icons.min.css">
     <link rel="stylesheet" href="cssStyle.css">
@@ -13,8 +14,8 @@
     <header class="header-navbar">
         <div class="header-container">
             <a class="brand-link" href="dashboardPage.html">
-                <i class="bi bi-heart-pulse-fill brand-icon"></i>
-                <span>BWC-HDMS <small class="brand-version">v2.4</small></span>
+                <img src="icons/Logo.png" alt="BWC-HDMS Logo" class="brand-icon">
+                <span>BWC-HDMS</span>
             </a>
             <div class="nav-actions">
                 <button class="theme-toggle-btn" id="darkModeToggle" title="Toggle Dark/Light Mode">
@@ -77,15 +78,26 @@
             <!-- Page Title Bar -->
             <div class="d-flex justify-between align-center mb-4" style="flex-wrap: wrap; gap: 0.75rem;">
                 <div>
-                    <h2 style="font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em;">Monthly Schedule</h2>
-                    <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.2rem;">Upcoming check‑ups, purok assemblies and medicine refills.</p>
+                    <div class="d-flex align-center gap-2 mb-1" style="flex-wrap: wrap;">
+                        <h2 style="font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0;">Monthly Schedule</h2>
+                        <span id="liveClockWidget" class="badge badge-primary-subtle" style="font-size: 0.78rem; font-weight: 600; padding: 0.35rem 0.65rem; border-radius: 6px; letter-spacing: 0.01em;">
+                            <i class="bi bi-clock-history me-1.5 text-primary"></i>
+                            <span id="liveClockDate">Loading date...</span>
+                            <span class="mx-1 opacity-50">|</span>
+                            <span id="liveClockTime" class="font-mono">--:--:--</span>
+                        </span>
+                    </div>
+                    <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.2rem; margin-bottom: 0;">Upcoming check‑ups, purok assemblies and medicine refills.</p>
                 </div>
+                <button class="btn btn-primary btn-sm" onclick="openScheduleModal()">
+                    <i class="bi bi-calendar-plus me-1"></i> New Schedule Entry
+                </button>
             </div>
 
-            <!-- Filter Controls (Month selector) -->
+            <!-- Filter Controls (Month, Category, Status) -->
             <div class="card-custom mb-4" style="padding: 1rem;">
                 <div class="grid-3-col">
-                    <div class="form-group">
+                    <div class="form-group mb-0">
                         <label class="form-label" for="filterMonth">Month</label>
                         <select class="form-select" id="filterMonth" onchange="renderSchedule()">
                             <option value="">All Months</option>
@@ -103,13 +115,33 @@
                             <option value="11">December</option>
                         </select>
                     </div>
+                    <div class="form-group mb-0">
+                        <label class="form-label" for="filterCategory">Category / Type</label>
+                        <select class="form-select" id="filterCategory" onchange="renderSchedule()">
+                            <option value="">All Types</option>
+                            <option value="Monthly HPN Check">Monthly HPN Check</option>
+                            <option value="Diabetes Follow-up">Diabetes Follow-up</option>
+                            <option value="Medicine Refill">Medicine Refill</option>
+                            <option value="Purok Assembly">Purok Assembly</option>
+                        </select>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label class="form-label" for="filterStatus">Status</label>
+                        <select class="form-select" id="filterStatus" onchange="renderSchedule()">
+                            <option value="">All Statuses</option>
+                            <option value="Pending">Pending (Upcoming / Due)</option>
+                            <option value="Defaulted">Defaulted (Past Due / Missed)</option>
+                            <option value="Completed">Completed</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
             <!-- Schedule Table -->
             <div class="card-custom">
-                <div class="card-header-custom">
-                    <h5 class="card-header-title">Upcoming Events</h5>
+                <div class="card-header-custom d-flex justify-between align-center">
+                    <h5 class="card-header-title">Upcoming Events & Appointments</h5>
+                    <span class="text-muted" style="font-size: 0.75rem;">Automatic status tracking against server date</span>
                 </div>
                 <div class="card-body-no-padding">
                     <div class="table-responsive">
@@ -119,16 +151,128 @@
                                     <th class="ps-4">Date</th>
                                     <th>Type</th>
                                     <th>Details</th>
+                                    <th>Status</th>
+                                    <th class="text-right pe-4">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="scheduleTableBody">
-                                <!-- Rows injected by schedulePage.js -->
+                                <!-- Rows injected dynamically by schedulePage.js -->
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- =========================================================================
+         New Schedule Entry Modal
+         ========================================================================= -->
+    <div class="modal-backdrop-custom hidden" id="scheduleModal">
+        <div class="modal-dialog-box modal-dialog-md">
+            <div class="modal-header-custom">
+                <div>
+                    <h5 class="modal-title-custom">
+                        <i class="bi bi-calendar-plus-fill text-primary me-2"></i>New Schedule Entry
+                    </h5>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">Schedule client follow-ups, medicine refills, or community assemblies</p>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeScheduleModal()">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <form id="newScheduleForm" onsubmit="saveScheduleEntry(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="schedCategory">Schedule Category <span class="text-danger">*</span></label>
+                        <select class="form-select" id="schedCategory" required>
+                            <option value="Monthly HPN Check">Monthly HPN Check</option>
+                            <option value="Diabetes Follow-up">Diabetes Follow-up</option>
+                            <option value="Medicine Refill">Medicine Refill</option>
+                            <option value="Purok Assembly">Purok Assembly</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="schedPatientName">Target Client or Assembly Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="schedPatientName" placeholder="e.g. Juan Mercado Dela Cruz or Purok 2 Residents" required list="patientSuggestions">
+                        <datalist id="patientSuggestions">
+                            <option value="Juan Mercado Dela Cruz">
+                            <option value="Maria Lopez Santos">
+                            <option value="Pedro Alvarez Penduko">
+                            <option value="Barangay Residents - Purok 1">
+                            <option value="Barangay Residents - Purok 2">
+                            <option value="Barangay Residents - Purok 3">
+                        </datalist>
+                    </div>
+
+                    <div class="grid-2-col mb-2">
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="schedDate">Scheduled Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="schedDate" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="schedPurok">Purok / Location <span class="text-danger">*</span></label>
+                            <select class="form-select" id="schedPurok" required>
+                                <option value="Poblacion 1">Poblacion 1</option>
+                                <option value="Poblacion 2">Poblacion 2</option>
+                                <option value="Poblacion 3">Poblacion 3</option>
+                                <option value="Barangay Health Station">Barangay Health Station</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <label class="form-label" for="schedRemarks">Details / Instructions / Remarks</label>
+                        <textarea class="form-control" id="schedRemarks" rows="3" placeholder="Enter clinical instructions, medicine to dispense, or assembly agenda..."></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary py-2" style="flex: 1;" onclick="closeScheduleModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary py-2" style="flex: 2;">
+                            <i class="bi bi-save me-1"></i> Save to Schedule
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         Reschedule Modal
+         ========================================================================= -->
+    <div class="modal-backdrop-custom hidden" id="rescheduleModal">
+        <div class="modal-dialog-box modal-dialog-sm">
+            <div class="modal-header-custom">
+                <div>
+                    <h5 class="modal-title-custom">
+                        <i class="bi bi-calendar-event text-primary me-2"></i>Reschedule Appointment
+                    </h5>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;" id="reschedPatientSubtitle">Update scheduled date</p>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeRescheduleModal()">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <form id="rescheduleForm" onsubmit="confirmReschedule(event)">
+                    <input type="hidden" id="reschedApptId">
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="reschedNewDate">New Scheduled Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="reschedNewDate" required>
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <label class="form-label" for="reschedReason">Reason for Rescheduling / Notes</label>
+                        <textarea class="form-control" id="reschedReason" rows="2" placeholder="e.g. Patient requested postponement; rescheduled due to weather..."></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary py-2" style="flex: 1;" onclick="closeRescheduleModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary py-2" style="flex: 2;">
+                            <i class="bi bi-check-lg me-1"></i> Confirm Reschedule
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->

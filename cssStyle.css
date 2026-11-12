@@ -1,87 +1,98 @@
-
 /* --------------------------------------------------------------------------
    1. Design & CSS Variables (Light & Dark Theme)
    -------------------------------------------------------------------------- */
 :root {
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     
-    /* Core Brand Colors */
-    --primary: #0d6efd;
-    --primary-hover: #0b5ed7;
-    --primary-subtle: #dbeafe;
-    --primary-text: #1d4ed8;
-    --primary-border: #bfdbfe;
+    /* --- Core Brand Colors (Logo-Matched & Enhanced) --- */
+    --primary: #045d62;        /* Deep Teal from the outer ring */
+    --primary-hover: #034549;  
+    --primary-gradient: linear-gradient(135deg, #045d62 0%, #087e85 100%); /* Fresh gradient for headers/buttons */
+    --primary-subtle: #e6f4f5; 
+    --primary-text: #045d62;   
+    --primary-border: #99c2c5; 
     
+    /* --- Logo Accent (Soft Pink Touch) --- */
+    --accent-pink: #fdf2f4;    /* Inspired by the soft pink background in your logo */
+    --accent-pink-border: #f9d5dc;
+    --accent-pink-text: #9b2c3c;
+
+    /* --- Status & Notifications --- */
     --success: #198754;
     --success-hover: #157347;
     --success-subtle: #d1e7dd;
     --success-text: #0f5132;
     --success-border: #a3cfbb;
     
-    --danger: #dc3545;
-    --danger-hover: #bb2d3b;
-    --danger-subtle: #f8d7da;
+    --danger: #e63946;         /* Vibrant red from logo hearts */
+    --danger-hover: #c52835;
+    --danger-subtle: #fde8e9;
     --danger-text: #842029;
-    --danger-border: #f1aeb5;
+    --danger-border: #f5b5b8;
     
-    --warning: #ffc107;
+    --warning: #ffb703;        /* Warm gold for inventory alerts */
     --warning-subtle: #fff3cd;
     --warning-text: #664d03;
     --warning-border: #ffe69c;
 
-    /* Surfaces & Layout (Light Theme) */
-    --bg-body: #f0f2f5;
-    --bg-surface: #ffffff;
-    --bg-surface-secondary: #f8fafc;
-    --bg-surface-hover: #f1f5f9;
+    /* --- Surfaces & Layout (Clean, Layered Light Theme) --- */
+    --bg-body: #f1f5f5;       /* Modern, clean slate-teal background tint */
+    --bg-surface: #ffffff;     /* Pure white cards */
+    --bg-surface-secondary: #fafcff; 
+    --bg-surface-hover: #f1f7f7;
     --bg-input: #ffffff;
-    --border-color: #e2e8f0;
+    --border-color: #cbd5e1;
     --border-subtle: #f1f5f9;
-    --text-main: #1e293b;
+    --text-main: #1e293b;      
     --text-muted: #64748b;
     --text-light: #94a3b8;
     
-    --nav-active-bg: rgba(13, 110, 253, 0.1);
-    --nav-active-text: #0d6efd;
+    --nav-active-bg: rgba(4, 93, 98, 0.08);  
+    --nav-active-text: #045d62;
     
-    /* Shadows */
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    /* --- Enhanced Shadows (Gives depth without clutter) --- */
+    --shadow-xs: 0 1px 2px rgba(4, 93, 98, 0.04);
+    --shadow-sm: 0 2px 4px rgba(4, 93, 98, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 6px 12px -2px rgba(4, 93, 98, 0.08), 0 3px 6px -3px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 12px 20px -4px rgba(4, 93, 98, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
 }
 
 /* Dark Theme Overrides */
 [data-bs-theme="dark"],
 .dark {
-    --bg-body: #0f172a;
-    --bg-surface: #1e293b;
-    --bg-surface-secondary: #243042;
-    --bg-surface-hover: #2b394e;
-    --bg-input: #1e293b;
-    --border-color: #334155;
-    --border-subtle: #1e293b;
+    --bg-body: #080e14;
+    --bg-surface: #101720;
+    --bg-surface-secondary: #16202c;
+    --bg-surface-hover: #1e2938;
+    --bg-input: #101720;
+    --border-color: #273647;
+    --border-subtle: #101720;
     --text-main: #f8fafc;
     --text-muted: #94a3b8;
     --text-light: #64748b;
     
-    --nav-active-bg: rgba(13, 110, 253, 0.2);
-    --nav-active-text: #6ea8fe;
+    --primary-gradient: linear-gradient(135deg, #045d62 0%, #0a8189 100%);
+    --nav-active-bg: rgba(79, 195, 201, 0.2);
+    --nav-active-text: #ffffff;
     
-    --primary-subtle: rgba(13, 110, 253, 0.25);
-    --primary-text: #93c5fd;
-    --primary-border: rgba(13, 110, 253, 0.4);
+    --primary-subtle: rgba(79, 195, 201, 0.25);
+    --primary-text: #4fc3c9;   
+    --primary-border: rgba(79, 195, 201, 0.4);
+    
+    --accent-pink: rgba(230, 57, 70, 0.15);
+    --accent-pink-border: rgba(230, 57, 70, 0.3);
+    --accent-pink-text: #fca5a5;
     
     --success-subtle: rgba(25, 135, 84, 0.25);
     --success-text: #86efac;
     --success-border: #1e4631;
     
-    --danger-subtle: rgba(220, 53, 69, 0.25);
+    --danger-subtle: rgba(230, 57, 70, 0.25);
     --danger-text: #fca5a5;
     --danger-border: #5c1e24;
     
-    --warning-subtle: rgba(255, 193, 7, 0.25);
+    --warning-subtle: rgba(255, 183, 3, 0.25);
     --warning-text: #fde047;
     --warning-border: #634b07;
 }
@@ -124,8 +135,8 @@ button, input, select, textarea {
     z-index: 40;
     width: 100%;
     background-color: var(--bg-surface);
-    border-bottom: 1px solid var(--border-color);
-    box-shadow: var(--shadow-xs);
+    border-bottom: 2px solid var(--primary);
+    box-shadow: var(--shadow-sm);
     transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
@@ -147,9 +158,10 @@ button, input, select, textarea {
 }
 
 .brand-icon {
-    font-size: 1.5rem;
+    width: 32px;
+    height: 32px;
     margin-right: 0.5rem;
-    color: var(--danger);
+    object-fit: contain;
 }
 
 .brand-version {
@@ -181,7 +193,9 @@ button, input, select, textarea {
 }
 
 .theme-toggle-btn:hover {
-    background-color: var(--bg-surface-secondary);
+    background-color: var(--primary-subtle);
+    color: var(--primary);
+    border-color: var(--primary-border);
 }
 
 /* User Profile & Dropdown */
@@ -196,13 +210,20 @@ button, input, select, textarea {
     border: none;
     cursor: pointer;
     text-align: left;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    transition: background-color 0.15s ease;
+}
+
+.user-profile-btn:hover {
+    background-color: var(--bg-surface-secondary);
 }
 
 .user-avatar {
     width: 38px;
     height: 38px;
     border-radius: 9999px;
-    background-color: var(--primary);
+    background: var(--primary-gradient);
     color: #ffffff;
     display: flex;
     align-items: center;
@@ -257,7 +278,8 @@ button, input, select, textarea {
 }
 
 .dropdown-item-custom:hover {
-    background-color: var(--bg-surface-hover);
+    background-color: var(--primary-subtle);
+    color: var(--primary);
 }
 
 .dropdown-item-danger {
@@ -266,6 +288,7 @@ button, input, select, textarea {
 
 .dropdown-item-danger:hover {
     background-color: var(--danger-subtle);
+    color: var(--danger-text);
 }
 
 .dropdown-divider-custom {
@@ -334,14 +357,22 @@ button, input, select, textarea {
 }
 
 .nav-link:hover {
-    background-color: var(--bg-surface-secondary);
-    color: var(--text-main);
+    background-color: var(--primary-subtle);
+    color: var(--primary);
+}
+
+/* Dark Theme Hover Fix for Navbar Links (Turns white on hover) */
+[data-bs-theme="dark"] .nav-link:hover,
+.dark .nav-link:hover {
+    background-color: var(--primary-subtle);
+    color: #ffffff !important;
 }
 
 .nav-link.active {
     background-color: var(--nav-active-bg) !important;
     color: var(--nav-active-text) !important;
     font-weight: 600;
+    border-left: 4px solid var(--primary);
 }
 
 .sync-status-box {
@@ -405,7 +436,7 @@ button, input, select, textarea {
     background-color: var(--bg-surface);
     border-radius: 8px;
     padding: 1.25rem;
-    box-shadow: var(--shadow-xs);
+    box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
     border-left: 5px solid;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -418,18 +449,22 @@ button, input, select, textarea {
 
 .stat-card-blue {
     border-left-color: var(--primary);
+    background: linear-gradient(to right, var(--primary-subtle), var(--bg-surface) 30%);
 }
 
 .stat-card-red {
     border-left-color: var(--danger);
+    background: linear-gradient(to right, var(--danger-subtle), var(--bg-surface) 30%);
 }
 
 .stat-card-yellow {
     border-left-color: var(--warning);
+    background: linear-gradient(to right, var(--warning-subtle), var(--bg-surface) 30%);
 }
 
 .stat-card-green {
     border-left-color: var(--success);
+    background: linear-gradient(to right, var(--success-subtle), var(--bg-surface) 30%);
 }
 
 .stat-card-title {
@@ -473,7 +508,7 @@ button, input, select, textarea {
 .card-custom {
     background-color: var(--bg-surface);
     border-radius: 8px;
-    box-shadow: var(--shadow-xs);
+    box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
     overflow: hidden;
     display: flex;
@@ -486,7 +521,7 @@ button, input, select, textarea {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background-color: transparent;
+    background-color: var(--bg-surface-secondary);
 }
 
 .card-header-title {
@@ -640,7 +675,7 @@ button, input, select, textarea {
 }
 
 /* --------------------------------------------------------------------------
-   9. Buttons
+   9. Buttons (Uniform Gradient & Theme Variables)
    -------------------------------------------------------------------------- */
 .btn {
     display: inline-flex;
@@ -669,7 +704,7 @@ button, input, select, textarea {
 }
 
 .btn-primary {
-    background-color: var(--primary);
+    background: var(--primary-gradient);
     color: #ffffff;
     border-color: var(--primary);
     box-shadow: var(--shadow-xs);
@@ -678,6 +713,7 @@ button, input, select, textarea {
 .btn-primary:hover:not(:disabled) {
     background-color: var(--primary-hover);
     border-color: var(--primary-hover);
+    filter: brightness(0.95);
 }
 
 .btn-success {
@@ -695,12 +731,13 @@ button, input, select, textarea {
 .btn-outline-primary {
     background-color: transparent;
     color: var(--primary);
-    border-color: var(--primary);
+    border-color: var(--primary-border);
 }
 
 .btn-outline-primary:hover:not(:disabled) {
     background-color: var(--primary);
     color: #ffffff;
+    border-color: var(--primary);
 }
 
 .btn-outline-success {
@@ -725,25 +762,18 @@ button, input, select, textarea {
     color: var(--text-main);
 }
 
+/* Unified btn-dark to match the primary gradient style across the app */
 .btn-dark {
-    background-color: #1e293b;
+    background: var(--primary-gradient);
     color: #ffffff;
-    border-color: #1e293b;
+    border-color: var(--primary);
+    box-shadow: var(--shadow-xs);
 }
 
 .btn-dark:hover:not(:disabled) {
-    background-color: #0f172a;
-}
-
-[data-bs-theme="dark"] .btn-dark,
-.dark .btn-dark {
-    background-color: #334155;
-    border-color: #334155;
-}
-
-[data-bs-theme="dark"] .btn-dark:hover:not(:disabled),
-.dark .btn-dark:hover:not(:disabled) {
-    background-color: #475569;
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+    filter: brightness(0.95);
 }
 
 .btn-full {
@@ -781,7 +811,7 @@ button, input, select, textarea {
 .form-control:focus,
 .form-select:focus {
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    box-shadow: 0 0 0 3px var(--primary-subtle);
 }
 
 .form-control[readonly] {
@@ -824,8 +854,8 @@ textarea.form-control {
     align-items: center;
     justify-content: center;
     padding: 1rem;
-    background-color: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(2px);
+    background-color: rgba(4, 93, 98, 0.35);
+    backdrop-filter: blur(3px);
     transition: opacity 0.25s ease;
 }
 
@@ -835,6 +865,9 @@ textarea.form-control {
     box-shadow: var(--shadow-xl);
     width: 100%;
     max-width: 500px;
+    max-height: 94vh;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     border: 1px solid var(--border-color);
     transform: scale(1);
@@ -845,21 +878,39 @@ textarea.form-control {
     max-width: 440px;
 }
 
+.modal-dialog-md {
+    max-width: 580px;
+}
+
+.modal-dialog-lg {
+    max-width: 880px;
+}
+
+.modal-dialog-xl {
+    max-width: 1060px;
+}
+
+.badge-secondary-subtle {
+    background-color: rgba(148, 163, 184, 0.15);
+    color: var(--text-muted);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
 .modal-header-custom {
-    padding: 0.85rem 1.25rem;
+    padding: 1rem 2rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 
 .modal-header-primary {
-    background-color: var(--primary);
+    background: var(--primary-gradient);
     color: #ffffff;
 }
 
 .modal-title-custom {
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: 1.05rem;
+    font-weight: 700;
     display: flex;
     align-items: center;
 }
@@ -867,7 +918,7 @@ textarea.form-control {
 .modal-close-btn {
     background: transparent;
     border: none;
-    font-size: 1.25rem;
+    font-size: 1.35rem;
     line-height: 1;
     color: var(--text-light);
     cursor: pointer;
@@ -878,15 +929,157 @@ textarea.form-control {
 }
 
 .modal-body-custom {
-    padding: 1.25rem;
-    font-size: 0.875rem;
+    padding: 1.75rem 2rem;
+    font-size: 0.9rem;
+    overflow-y: auto;
+    max-height: calc(95vh - 130px);
 }
 
 .modal-footer-custom {
-    padding: 0.75rem 1.25rem;
+    padding: 1rem 2rem;
     background-color: var(--bg-surface-secondary);
     border-top: 1px solid var(--border-color);
 }
+
+/* Dividing / Separator Line Between Form Fields & Sections */
+.form-field-divider {
+    border: none;
+    height: 1.50px;
+    background-color: var(--border-color);
+    margin: 1.25rem 0;
+    opacity: 100;
+}
+
+/* Form Section Dividers */
+.form-section-divider {
+    margin-top: 1.25rem;
+    margin-bottom: 0.75rem;
+    padding-top: 0.85rem;
+    border-top: 1px dashed var(--border-color);
+}
+
+.section-badge-title {
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -0.01em;
+}
+
+.section-help-text {
+    font-size: 0.73rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.35;
+}
+
+/* Social Program Checkbox Cards */
+.program-checkbox-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+}
+@media (min-width: 640px) {
+    .program-checkbox-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.program-checkbox-card {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-surface-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    font-size: 0.82rem;
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.program-checkbox-card:hover {
+    background-color: var(--accent-pink);
+    border-color: var(--accent-pink-border);
+}
+
+.program-checkbox-card.active,
+.program-checkbox-card:has(input:checked) {
+    border-color: var(--primary);
+    background-color: var(--primary-subtle);
+    color: var(--primary-text);
+}
+
+.form-checkbox-custom {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--primary);
+    cursor: pointer;
+    margin-right: 0.55rem;
+    flex-shrink: 0;
+}
+
+/* File Upload Customized Dropzone */
+.file-upload-zone {
+    border: 2px dashed var(--primary-border);
+    border-radius: 8px;
+    padding: 1.25rem 1rem;
+    text-align: center;
+    background-color: var(--bg-surface-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.file-upload-zone:hover,
+.file-upload-zone.dragover {
+    border-color: var(--primary);
+    background-color: var(--primary-subtle);
+}
+
+.file-upload-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background-color: var(--primary-subtle);
+    color: var(--primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.45rem;
+    margin-bottom: 0.5rem;
+}
+
+.uploaded-file-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 0.75rem;
+    background-color: var(--bg-surface-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    color: var(--text-main);
+    transition: background-color 0.2s ease;
+}
+
+.uploaded-file-chip:hover {
+    background-color: var(--bg-surface-hover);
+}
+
+/* Tailwind utility mappings */
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.space-y-1 > * + * { margin-top: 0.25rem; }
+.space-y-2 > * + * { margin-top: 0.5rem; }
+.rounded-md { border-radius: 6px; }
+.rounded-lg { border-radius: 8px; }
+.text-xs { font-size: 0.75rem; }
+.text-sm { font-size: 0.875rem; }
 
 /* --------------------------------------------------------------------------
    12. Floating Toast Notification
@@ -1050,6 +1243,46 @@ textarea.form-control {
     }
 }
 
+.grid-3-equal {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+}
+@media (min-width: 640px) {
+    .grid-3-equal {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.risk-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.65rem;
+    border-radius: 9999px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-surface-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+    color: var(--text-main);
+}
+.risk-tag-chip:hover {
+    border-color: var(--primary);
+    background-color: var(--primary-subtle);
+}
+.risk-tag-chip:has(input:checked),
+.risk-tag-chip.active {
+    background-color: var(--primary-subtle);
+    border-color: var(--primary);
+    color: var(--primary-text);
+}
+.risk-tag-chip input {
+    margin-right: 0.35rem;
+    accent-color: var(--primary);
+}
+
 .grid-consultation {
     display: grid;
     grid-template-columns: 1fr;
@@ -1085,8 +1318,8 @@ textarea.form-control {
     align-items: center;
     justify-content: center;
     padding: 1.5rem;
-    background: radial-gradient(circle at top right, rgba(13, 110, 253, 0.08), transparent 40%),
-                radial-gradient(circle at bottom left, rgba(25, 135, 84, 0.08), transparent 40%),
+    background: radial-gradient(circle at top right, rgba(4, 93, 98, 0.12), transparent 40%),
+                radial-gradient(circle at bottom left, rgba(230, 57, 70, 0.08), transparent 40%),
                 var(--bg-body);
 }
 
@@ -1110,13 +1343,15 @@ textarea.form-control {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 58px;
-    height: 58px;
-    border-radius: 9999px;
-    background-color: rgba(220, 53, 69, 0.1);
-    color: var(--danger);
-    font-size: 2rem;
+    width: 72px;
+    height: 72px;
     margin-bottom: 0.75rem;
+}
+
+.login-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .login-title {
@@ -1131,4 +1366,3 @@ textarea.form-control {
     color: var(--text-muted);
     margin-top: 0.25rem;
 }
-

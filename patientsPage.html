@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Patients Registry | BWC-HDMS Portal</title>
+    <link rel="icon" type="image/png" href="icons/Logo.png">
     <!-- Local Offline Assets -->
     <link rel="stylesheet" href="icons/bootstrap-icons.min.css">
     <link rel="stylesheet" href="cssStyle.css">
@@ -14,8 +15,8 @@
     <header class="header-navbar">
         <div class="header-container">
             <a class="brand-link" href="dashboardPage.html">
-                <i class="bi bi-heart-pulse-fill brand-icon"></i>
-                <span>BWC-HDMS <small class="brand-version">v2.4</small></span>
+                <img src="icons/Logo.png" alt="BWC-HDMS Logo" class="brand-icon">
+                <span>BWC-HDMS</span>
             </a>
             
             <div class="nav-actions">
@@ -115,18 +116,17 @@
                     <div>
                         <select class="form-select" id="filterCondition" onchange="filterTCR()">
                             <option value="">All Conditions</option>
-                            <option value="Hypertension">Hypertension</option>
-                            <option value="Diabetes">Type 2 Diabetes</option>
+                            <option value="Hypertension">Hypertension Only</option>
+                            <option value="Diabetes">Diabetes Only</option>
                             <option value="Both">Both (HPN & DM)</option>
                         </select>
                     </div>
                     <div>
                         <select class="form-select" id="filterPurok" onchange="filterTCR()">
                             <option value="">All Puroks</option>
-                            <option value="Purok 1">Purok 1</option>
-                            <option value="Purok 2">Purok 2</option>
-                            <option value="Purok 3">Purok 3</option>
-                            <option value="Purok 4">Purok 4</option>
+                            <option value="Poblacion 1">Poblacion 1</option>
+                            <option value="Poblacion 2">Poblacion 2</option>
+                            <option value="Poblacion 3">Poblacion 3</option>
                         </select>
                     </div>
                 </div>
@@ -151,32 +151,39 @@
                             <tbody id="tcrTableBody">
                                 <tr>
                                     <td class="ps-4">
-                                        <div class="fw-semibold">Juan Dela Cruz</div>
+                                        <div class="fw-semibold">Juan Mercado Dela Cruz</div>
                                         <small class="text-muted" style="font-size: 0.75rem;">PH: 12-345678901-2</small>
+                                        <div class="mt-1 d-flex flex-wrap gap-1">
+                                            <span class="badge badge-primary-subtle" style="font-size: 0.65rem;">Senior Citizen ID Holder</span>
+                                        </div>
                                     </td>
                                     <td>54 / M</td>
-                                    <td>Purok 3, San Jose</td>
-                                    <td><span class="badge badge-danger-subtle">Hypertension</span></td>
+                                    <td>Poblacion 3, San Jose</td>
+                                    <td><span class="badge badge-danger-subtle">Hypertension Only</span></td>
                                     <td>Oct 14, 2026</td>
                                     <td><span class="badge badge-warning">Moderate</span></td>
                                     <td class="text-right pe-4 space-x-1">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="openPatientRecord('Juan Dela Cruz')"><i class="bi bi-eye"></i></button>
-                                        <button class="btn btn-sm btn-outline-success" onclick="quickPrescribe('Juan Dela Cruz')"><i class="bi bi-capsule"></i></button>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="openPatientRecord('Juan Mercado Dela Cruz')" title="View Patient Profile"><i class="bi bi-eye"></i></button>
+                                        <button class="btn btn-sm btn-outline-success" onclick="quickPrescribe('Juan Mercado Dela Cruz')" title="Consult / Prescribe"><i class="bi bi-capsule"></i></button>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="ps-4">
-                                        <div class="fw-semibold">Maria Santos</div>
+                                        <div class="fw-semibold">Maria Lopez Santos</div>
                                         <small class="text-muted" style="font-size: 0.75rem;">PH: 14-987654321-9</small>
+                                        <div class="mt-1 d-flex flex-wrap gap-1">
+                                            <span class="badge badge-primary-subtle" style="font-size: 0.65rem;">4Ps</span>
+                                            <span class="badge badge-primary-subtle" style="font-size: 0.65rem;">PWD</span>
+                                        </div>
                                     </td>
                                     <td>61 / F</td>
-                                    <td>Purok 1, San Jose</td>
-                                    <td><span class="badge badge-primary-subtle">Type 2 Diabetes</span></td>
+                                    <td>Poblacion 1, San Jose</td>
+                                    <td><span class="badge badge-primary-subtle">Diabetes Only</span></td>
                                     <td>Oct 14, 2026</td>
                                     <td><span class="badge badge-danger">High Risk</span></td>
                                     <td class="text-right pe-4 space-x-1">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="openPatientRecord('Maria Santos')"><i class="bi bi-eye"></i></button>
-                                        <button class="btn btn-sm btn-outline-success" onclick="quickPrescribe('Maria Santos')"><i class="bi bi-capsule"></i></button>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="openPatientRecord('Maria Lopez Santos')" title="View Patient Profile"><i class="bi bi-eye"></i></button>
+                                        <button class="btn btn-sm btn-outline-success" onclick="quickPrescribe('Maria Lopez Santos')" title="Consult / Prescribe"><i class="bi bi-capsule"></i></button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -190,55 +197,402 @@
 
     <!-- Register New Patient Modal -->
     <div class="modal-overlay hidden" id="patientModal" role="dialog" aria-modal="true">
-        <div class="modal-dialog-box modal-dialog-sm">
+        <div class="modal-dialog-box modal-dialog-xl">
             <div class="modal-header-custom" style="border-bottom: 1px solid var(--border-color);">
-                <h5 class="modal-title-custom">Register New Client in TCR</h5>
+                <div>
+                    <h5 class="modal-title-custom">
+                        <i class="bi bi-person-plus-fill text-primary me-2"></i> Register New Client in TCR
+                    </h5>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">Target Client Registry for Hypertension and Diabetes Management</p>
+                </div>
                 <button type="button" class="modal-close-btn" onclick="closeModal('patientModal')">&times;</button>
             </div>
             <div class="modal-body-custom">
                 <form id="newPatientForm" onsubmit="savePatient(event)">
-                    <div class="form-group">
-                        <label class="form-label">Full Name</label>
-                        <input type="text" class="form-control" id="newPatientName" placeholder="e.g., Juan Dela Cruz" required>
+                    
+                    <!-- ========================================================
+                         1. Personal Demographics
+                         ======================================================== -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-person-vcard text-primary me-2"></i>
+                        <span>Personal Demographics</span>
                     </div>
-                    <div class="grid-2-col mb-2">
+
+                    <!-- Full Name: First, Middle, Last -->
+                    <div class="grid-3-col mb-3">
                         <div class="form-group mb-0">
-                            <label class="form-label">Age</label>
-                            <input type="number" class="form-control" id="newPatientAge" placeholder="45" required>
+                            <label class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="newPatientFirstName" placeholder="e.g., Juan" required>
                         </div>
                         <div class="form-group mb-0">
-                            <label class="form-label">Sex</label>
-                            <select class="form-select" id="newPatientSex">
-                                <option value="M">Male</option>
-                                <option value="F">Female</option>
+                            <label class="form-label">Middle Name</label>
+                            <input type="text" class="form-control" id="newPatientMiddleName" placeholder="e.g., Mercado">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="newPatientLastName" placeholder="e.g., Dela Cruz" required>
+                        </div>
+                    </div>
+
+                    <!-- Birth Date, Age, Gender -->
+                    <div class="grid-3-equal mb-3">
+                        <div class="form-group mb-0">
+                            <label class="form-label">Birth Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="newPatientDOB" required onchange="calculateAgeFromDOB(this.value)">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">Age <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="newPatientAge" placeholder="Auto / Enter age" min="1" max="130" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">Gender <span class="text-danger">*</span></label>
+                            <select class="form-select" id="newPatientSex" required>
+                                <option value="" disabled selected>Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other / Prefer not to say</option>
                             </select>
                         </div>
                     </div>
-                    <div class="grid-2-col mb-2">
+
+                    <!-- Purok & Address -->
+                    <div class="grid-2-col mb-3">
                         <div class="form-group mb-0">
-                            <label class="form-label">Purok</label>
-                            <select class="form-select" id="newPatientPurok">
-                                <option value="Purok 1">Purok 1</option>
-                                <option value="Purok 2">Purok 2</option>
-                                <option value="Purok 3">Purok 3</option>
-                                <option value="Purok 4">Purok 4</option>
+                            <label class="form-label">Purok Address within Barangay <span class="text-danger">*</span></label>
+                            <select class="form-select" id="newPatientPurok" required>
+                                <option value="" disabled selected>Select Barangay Purok / Poblacion</option>
+                                <option value="Poblacion 1">Poblacion 1</option>
+                                <option value="Poblacion 2">Poblacion 2</option>
+                                <option value="Poblacion 3">Poblacion 3</option>
                             </select>
                         </div>
                         <div class="form-group mb-0">
-                            <label class="form-label">Condition</label>
-                            <select class="form-select" id="newPatientCondition">
-                                <option value="Hypertension">Hypertension</option>
-                                <option value="Type 2 Diabetes">Type 2 Diabetes</option>
-                                <option value="Both">Both (HPN & DM)</option>
-                            </select>
+                            <label class="form-label">House / Block / Sitio Address</label>
+                            <input type="text" class="form-control" id="newPatientAddress" placeholder="e.g., House No. 24, Sitio Bukid">
                         </div>
                     </div>
+
+                    <!-- Contact Number & PhilHealth ID -->
+                    <div class="grid-2-col mb-3">
+                        <div class="form-group mb-0">
+                            <label class="form-label">Patient Contact Number <span class="text-danger">*</span></label>
+                            <input type="tel" class="form-control" id="newPatientContact" placeholder="09XX-XXX-XXXX" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">PhilHealth ID No.</label>
+                            <input type="text" class="form-control" id="newPatientPH" placeholder="12-345678901-2">
+                        </div>
+                    </div>
+
+                    <hr class="form-field-divider">
+
+                    <!-- ========================================================
+                         2. Condition Classification
+                         ======================================================== -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-heart-pulse text-danger me-2"></i>
+                        <span>Condition Classification</span>
+                    </div>
+                    <p class="section-help-text mb-3">Indicate chronic disease focus and diagnosis timeline for clinical tracking.</p>
+
+                    <div class="grid-2-col mb-3">
+                        <div class="form-group mb-0">
+                            <label class="form-label">Chronic Disease Diagnosis <span class="text-danger">*</span></label>
+                            <select class="form-select" id="newPatientCondition" required>
+                                <option value="" disabled selected>Select Chronic Disease Focus</option>
+                                <option value="Hypertension Only">Hypertension Only</option>
+                                <option value="Diabetes Only">Diabetes Only</option>
+                                <option value="Both">Both (Hypertension & Diabetes)</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">Diagnosis Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="newPatientDiagnosisDate" required>
+                        </div>
+                    </div>
+
+                    <hr class="form-field-divider">
+
+                    <!-- ========================================================
+                         3. Emergency Contact Details
+                         ======================================================== -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-telephone-plus text-warning me-2"></i>
+                        <span>Emergency Contact Details <span class="text-danger">*</span></span>
+                    </div>
+                    <p class="section-help-text mb-3">Designated relative or guardian to contact immediately during health emergencies.</p>
+
+                    <div class="grid-3-equal mb-3">
+                        <div class="form-group mb-0">
+                            <label class="form-label">Relative / Guardian Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="newPatientEmergencyName" placeholder="e.g., Juana Dela Cruz" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">Relationship <span class="text-danger">*</span></label>
+                            <select class="form-select" id="newPatientEmergencyRel" required>
+                                <option value="" disabled selected>Select Relationship</option>
+                                <option value="Spouse">Spouse</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Child">Child (Son / Daughter)</option>
+                                <option value="Sibling">Sibling (Brother / Sister)</option>
+                                <option value="Guardian">Guardian</option>
+                                <option value="Other Relative">Other Relative</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">Emergency Phone Number <span class="text-danger">*</span></label>
+                            <input type="tel" class="form-control" id="newPatientEmergencyPhone" placeholder="09XX-XXX-XXXX" required>
+                        </div>
+                    </div>
+
+                    <hr class="form-field-divider">
+
+                    <!-- ========================================================
+                         4. Government & Social Program Enrollments
+                         ======================================================== -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-card-checklist text-primary me-2"></i>
+                        <span>Government & Social Program Enrollments</span>
+                    </div>
+                    <p class="section-help-text mb-3">Track patient enrollment in community or national welfare programs.</p>
+
+                    <div class="program-checkbox-grid mb-2">
+                        <!-- Solo Parent -->
+                        <label class="program-checkbox-card">
+                            <input type="checkbox" name="socialPrograms" value="Solo Parent" id="progSoloParent" class="form-checkbox-custom">
+                            <span>Solo Parent</span>
+                        </label>
+
+                        <!-- 4Ps -->
+                        <label class="program-checkbox-card">
+                            <input type="checkbox" name="socialPrograms" value="4Ps (Pantawid Pamilyang Pilipino Program)" id="prog4Ps" class="form-checkbox-custom">
+                            <span>4Ps (Pantawid Pamilyang Pilipino Program)</span>
+                        </label>
+
+                        <!-- PWD -->
+                        <label class="program-checkbox-card">
+                            <input type="checkbox" name="socialPrograms" value="PWD (Persons with Disability)" id="progPWD" class="form-checkbox-custom">
+                            <span>PWD (Persons with Disability)</span>
+                        </label>
+
+                        <!-- Senior Citizen ID Holder -->
+                        <label class="program-checkbox-card">
+                            <input type="checkbox" name="socialPrograms" value="Senior Citizen ID Holder" id="progSenior" class="form-checkbox-custom">
+                            <span>Senior Citizen ID Holder</span>
+                        </label>
+
+                        <!-- Other Checkbox -->
+                        <label class="program-checkbox-card">
+                            <input type="checkbox" name="socialPrograms" value="Other" id="progOtherCheck" class="form-checkbox-custom" onchange="toggleOtherProgramInput(this)">
+                            <span>Other: [ Custom ]</span>
+                        </label>
+                    </div>
+
+                    <!-- Custom "Other" Text Input -->
+                    <div id="progOtherContainer" class="form-group mb-3 hidden">
+                        <label class="form-label" style="font-size: 0.75rem; color: var(--primary);">Specify Other Program / Assistance</label>
+                        <input type="text" class="form-control" id="newPatientProgOther" placeholder="e.g., TUPAD beneficiary, DSWD AICS, local barangay welfare assistance...">
+                    </div>
+
+                    <hr class="form-field-divider">
+
+                    <!-- ========================================================
+                         5. Medical History & Health Background
+                         ======================================================== -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-file-earmark-medical text-primary me-2"></i>
+                        <span>Medical History & Health Background</span>
+                    </div>
+                    <p class="section-help-text mb-3">Record past illnesses, pre-existing health risks, and known allergies.</p>
+
+                    <!-- Pre-existing Health Risks -->
+                    <div class="form-group mb-3">
+                        <label class="form-label">Pre-existing Health Risks</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <label class="risk-tag-chip">
+                                <input type="checkbox" name="healthRisks" value="Smoking / Tobacco"> Smoking / Tobacco
+                            </label>
+                            <label class="risk-tag-chip">
+                                <input type="checkbox" name="healthRisks" value="Alcohol Use"> Alcohol Consumption
+                            </label>
+                            <label class="risk-tag-chip">
+                                <input type="checkbox" name="healthRisks" value="Family History of Stroke / CVD"> Family History of Stroke / CVD
+                            </label>
+                            <label class="risk-tag-chip">
+                                <input type="checkbox" name="healthRisks" value="Family History of Diabetes"> Family History of Diabetes
+                            </label>
+                            <label class="risk-tag-chip">
+                                <input type="checkbox" name="healthRisks" value="Physical Inactivity"> Physical Inactivity
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Known Allergies -->
+                    <div class="form-group mb-3">
+                        <label class="form-label" for="newPatientAllergies">Known Allergies</label>
+                        <input type="text" class="form-control" id="newPatientAllergies" placeholder="e.g., Penicillin, Sulfonamides, Aspirin, Seafood (leave blank if none)">
+                    </div>
+
+                    <!-- Past Illnesses & Clinical Notes -->
+                    <div class="form-group mb-3">
+                        <label class="form-label" for="newPatientMedHistory">Past Illnesses & Clinical Background</label>
+                        <textarea class="form-control" id="newPatientMedHistory" rows="3" placeholder="e.g., Previous hospitalization for pneumonia in 2020, maintenance Metformin 500mg BID, family history of coronary heart disease..."></textarea>
+                    </div>
+
+                    <hr class="form-field-divider">
+
+                    <!-- ========================================================
+                         6. Digital Document Attachments
+                         ======================================================== -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-paperclip text-primary me-2"></i>
+                        <span>Digital Document Attachments</span>
+                    </div>
+                    <p class="section-help-text mb-3">Upload supporting identification cards, prescriptions, or laboratory results.</p>
+
                     <div class="form-group mb-4">
-                        <label class="form-label">PhilHealth ID No.</label>
-                        <input type="text" class="form-control" id="newPatientPH" placeholder="12-345678901-2" required>
+                        <div class="file-upload-zone" onclick="document.getElementById('newPatientAttachment').click()">
+                            <input type="file" id="newPatientAttachment" class="hidden" multiple accept=".pdf,image/*,.doc,.docx" onchange="handlePatientFileUpload(this)">
+                            <div class="d-flex flex-column align-center justify-center">
+                                <div class="file-upload-icon">
+                                    <i class="bi bi-cloud-arrow-up-fill"></i>
+                                </div>
+                                <div class="fw-semibold text-main mb-1" style="font-size: 0.9rem;">
+                                    <span class="text-primary" style="text-decoration: underline;">Click to browse</span> or drag & drop files here
+                                </div>
+                                <div class="text-muted" style="font-size: 0.78rem;">
+                                    Valid IDs (Solo Parent, PWD, Senior), Prescriptions, or Recent Lab Results (FBS, RBS, HbA1c)
+                                </div>
+                                <div class="d-flex align-center gap-2 mt-2">
+                                    <span class="badge badge-primary-subtle" style="font-size: 0.7rem;">PDF, PNG, JPG, JPEG</span>
+                                    <span class="text-muted" style="font-size: 0.7rem;">Stored locally for health center records</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Uploaded files list preview -->
+                        <div id="fileUploadList" class="mt-2 space-y-1 hidden"></div>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-full py-2 fw-semibold">Save to Registry</button>
+
+                    <div class="d-flex gap-2 pt-3" style="border-top: 1px solid var(--border-color);">
+                        <button type="button" class="btn btn-outline-secondary py-2.5 fw-semibold" style="flex: 1;" onclick="closeModal('patientModal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary py-2.5 fw-semibold" style="flex: 2;">
+                            <i class="bi bi-check-lg me-1"></i> Save to Registry
+                        </button>
+                    </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Record Detail Modal -->
+    <div class="modal-overlay hidden" id="patientRecordModal" role="dialog" aria-modal="true">
+        <div class="modal-dialog-box modal-dialog-xl">
+            <div class="modal-header-custom" style="border-bottom: 1px solid var(--border-color);">
+                <div>
+                    <h5 class="modal-title-custom">
+                        <i class="bi bi-person-badge-fill text-primary me-2"></i> Client Health Profile
+                    </h5>
+                    <p class="text-muted mb-0" style="font-size: 0.75rem;">Verified Target Client Registry (TCR) record</p>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeModal('patientRecordModal')">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <!-- Patient Header Card -->
+                <div class="card-custom mb-3" style="background-color: var(--bg-surface-secondary); padding: 1.25rem; border-radius: 8px;">
+                    <div class="d-flex justify-between items-center">
+                        <div>
+                            <h4 class="fw-bold mb-1" id="recName" style="color: var(--text-main);">Juan Dela Cruz</h4>
+                            <p class="text-muted mb-1" id="recDemographics" style="font-size: 0.82rem;">54 years old • Male • Born Oct 14, 1972</p>
+                            <div class="d-flex flex-wrap gap-2 text-muted" style="font-size: 0.76rem;">
+                                <span><i class="bi bi-geo-alt-fill text-danger me-1"></i><span id="recAddress">Purok 3, San Jose</span></span>
+                                <span>•</span>
+                                <span><i class="bi bi-telephone-fill text-success me-1"></i><span id="recContact">0917-123-4567</span></span>
+                                <span>•</span>
+                                <span>PhilHealth: <span id="recPh" class="fw-semibold text-main">12-345678901-2</span></span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="badge badge-primary-subtle" id="recConditionBadge" style="font-size: 0.8rem;">Hypertension Only</span>
+                            <div class="mt-1">
+                                <span class="badge badge-warning" id="recRiskBadge">Moderate</span>
+                            </div>
+                            <div class="mt-1" style="font-size: 0.72rem; color: var(--text-muted);">
+                                Diagnosed: <span id="recDiagnosisDate" class="fw-medium text-main">Oct 14, 2022</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Emergency Contact Card -->
+                <div class="mb-3">
+                    <label class="form-label d-flex align-center">
+                        <i class="bi bi-telephone-plus text-warning me-1.5"></i> Emergency Contact (Relative / Guardian)
+                    </label>
+                    <div class="p-2.5 rounded d-flex justify-between align-center" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color);">
+                        <div>
+                            <div class="fw-semibold text-main" id="recEmergencyName">Juana Dela Cruz</div>
+                            <small class="text-muted" id="recEmergencyRel">Spouse</small>
+                        </div>
+                        <div class="d-flex align-center gap-1">
+                            <i class="bi bi-phone text-primary"></i>
+                            <span class="fw-medium text-main" id="recEmergencyPhone">0918-987-6543</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Government & Social Programs -->
+                <div class="mb-3">
+                    <label class="form-label d-flex align-center">
+                        <i class="bi bi-card-checklist text-primary me-1.5"></i> Government & Social Program Enrollments
+                    </label>
+                    <div id="recProgramsContainer" class="d-flex flex-wrap gap-1 p-2 rounded" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color); min-height: 42px;">
+                        <!-- Badges dynamically injected -->
+                    </div>
+                </div>
+
+                <!-- Health Risks & Known Allergies -->
+                <div class="grid-2-col mb-3">
+                    <div>
+                        <label class="form-label d-flex align-center">
+                            <i class="bi bi-shield-exclamation text-danger me-1.5"></i> Pre-existing Health Risks
+                        </label>
+                        <div id="recRisksContainer" class="d-flex flex-wrap gap-1 p-2 rounded" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color); min-height: 42px;">
+                            <!-- Health risks dynamically injected -->
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label d-flex align-center">
+                            <i class="bi bi-exclamation-octagon text-danger me-1.5"></i> Known Allergies
+                        </label>
+                        <div class="p-2 rounded" id="recAllergies" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.8rem; min-height: 42px; display: flex; align-items: center;">
+                            <!-- Allergies dynamically injected -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Past Illnesses & Clinical Background -->
+                <div class="mb-3">
+                    <label class="form-label d-flex align-center">
+                        <i class="bi bi-file-earmark-medical text-primary me-1.5"></i> Medical History & Clinical Background
+                    </label>
+                    <div class="p-2.5 rounded text-sm" id="recMedHistory" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color); color: var(--text-main); white-space: pre-wrap; min-height: 54px; font-size: 0.82rem; line-height: 1.45;">
+                        <!-- Medical history dynamically injected -->
+                    </div>
+                </div>
+
+                <!-- Digital Document Attachments -->
+                <div class="mb-2">
+                    <label class="form-label d-flex align-center">
+                        <i class="bi bi-paperclip text-primary me-1.5"></i> Attached Supporting Documents
+                    </label>
+                    <div id="recAttachmentsContainer" class="space-y-1">
+                        <!-- Attachment chips dynamically injected -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer-custom d-flex justify-between align-center">
+                <span class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-shield-check text-success me-1"></i> RA 10173 Data Privacy Compliant</span>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="closeModal('patientRecordModal')">Close Record</button>
             </div>
         </div>
     </div>
