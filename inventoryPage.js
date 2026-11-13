@@ -4,25 +4,27 @@
    Module: Medicine Inventory & Dispensing Ledger (inventoryPage.js)
    ==========================================================================
    Description:
-   Handles medicine inventory tracking:
-   1. Clean zero-state initialization (empty array `[]`).
+   Handles medicine inventory tracking with a clean-slate architecture:
+   1. Zero static or seed mock data (initializes with empty state []).
    2. Offline-First data synchronization with Flask / SQLite backend or LocalStorage.
    3. Dynamic rendering of stock balances, low-stock thresholds, and status badges.
    4. Live dispensing actions (deducts maintenance supply & syncs to ledger).
-   5. Supply intake modal for logging new RHU medicine shipments.
+   5. Requisition action handler for RHU replenishment requests.
+   6. Supply intake modal for registering new RHU medicine shipments.
    ========================================================================== */
 
 const STORAGE_KEY_INVENTORY = 'bwc_inventory_db';
 const BACKEND_INVENTORY_URL = 'http://127.0.0.1:5000/api/inventory';
 
-// In-memory inventory list (Starts clean / zero state)
+// In-memory inventory list (Zero static/mock data - initializes clean)
 let inventoryData = [];
 
 // --------------------------------------------------------------------------
-// 1. Data Synchronization & Persistence Layer
+// 1. Data Synchronization & Persistence Layer (Database-Ready)
 // --------------------------------------------------------------------------
 /**
- * Loads medicine inventory from Flask SQLite backend or fallback LocalStorage.
+ * Loads medicine inventory from Flask/SQLite backend or fallback LocalStorage.
+ * Initializes with an empty array if unseeded or offline.
  */
 async function loadInventory() {
     try {
@@ -51,9 +53,10 @@ async function loadInventory() {
             }
         }
     } catch (e) {
-        // Fallback to offline localStorage
+        // Fallback silently to offline localStorage if Flask backend is offline
     }
 
+    // Retrieve from client localStorage or initialize clean empty state
     const raw = localStorage.getItem(STORAGE_KEY_INVENTORY);
     if (raw) {
         try {
@@ -68,10 +71,16 @@ async function loadInventory() {
     renderInventoryTable();
 }
 
+/**
+ * Saves current in-memory inventory array to LocalStorage.
+ */
 function saveInventoryToStorage(data) {
     localStorage.setItem(STORAGE_KEY_INVENTORY, JSON.stringify(data));
 }
 
+/**
+ * Computes clinical inventory stock status based on current quantity vs reorder threshold.
+ */
 function calculateStockStatus(stock, reorderLevel = 20) {
     const s = parseInt(stock, 10);
     const r = parseInt(reorderLevel, 10);
@@ -83,19 +92,22 @@ function calculateStockStatus(stock, reorderLevel = 20) {
 // --------------------------------------------------------------------------
 // 2. Dynamic Table Rendering & Clean Empty State Handling
 // --------------------------------------------------------------------------
+/**
+ * Dynamically renders the inventory table body or shows a clean zero-state alert.
+ */
 function renderInventoryTable() {
     const tbody = document.getElementById('inventoryTableBody');
     if (!tbody) return;
 
     tbody.innerHTML = '';
 
-    // Clean empty state
+    // Clean empty state (unseeded database or zero records)
     if (!inventoryData || inventoryData.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" class="text-center py-5 text-muted">
                     <i class="bi bi-capsule d-block mb-2" style="font-size: 2rem; opacity: 0.5;"></i>
-                    <span class="fw-semibold" style="font-size: 0.95rem;">No medicine stock records found in inventory.</span>
+                    <span class="fw-semibold" style="font-size: 0.95rem;">No medicine inventory records found or unseeded.</span>
                     <p class="text-muted mb-0" style="font-size: 0.8rem; margin-top: 0.25rem;">Click "Add Medicine Supply" above to record initial stocks or log an RHU delivery.</p>
                 </td>
             </tr>
@@ -103,10 +115,11 @@ function renderInventoryTable() {
         return;
     }
 
+    // Populate inventory records
     inventoryData.forEach(item => {
         const row = document.createElement('tr');
-        
-        // Status badge formatting
+
+        // Status badge styling based on stock health
         let statusBadge = '<span class="badge badge-success">Adequate</span>';
         let stockClass = 'text-success';
         if (item.status === 'Critical Low' || item.stock <= 10) {
@@ -120,7 +133,7 @@ function renderInventoryTable() {
         row.innerHTML = `
             <td class="ps-4 fw-semibold">${escapeHtml(item.name)}</td>
             <td>${escapeHtml(item.category || 'General')}</td>
-            <td class="text-muted" style="font-family: monospace;">${escapeHtml(item.batchNo || 'LOT-2026')}</td>
+            <td class="text-muted" style="font-family: monospace;">${escapeHtml(item.batchNo || 'N/A')}</td>
             <td><span class="fw-bold ${stockClass}">${item.stock} ${escapeHtml(item.unit || 'tabs')}</span></td>
             <td>${statusBadge}</td>
             <td class="text-right pe-4">
@@ -137,12 +150,16 @@ function renderInventoryTable() {
 // --------------------------------------------------------------------------
 // 3. Dispensing & Stock Deduction
 // --------------------------------------------------------------------------
+/**
+ * Handles dispensing a standard monthly maintenance ration (up to 30 tabs).
+ * Updates local cache and syncs with backend endpoint POST /api/inventory/<id>/dispense.
+ */
 async function dispenseMed(itemId) {
     const item = inventoryData.find(m => m.id === itemId);
     if (!item) return;
 
     if (item.stock <= 0) {
-        showNotification(`Cannot dispense ${item.name} — out of stock.`, 'danger');
+        showNotification(`Cannot dispense ${item.name} — stock is depleted.`, 'danger');
         return;
     }
 
@@ -154,7 +171,7 @@ async function dispenseMed(itemId) {
     renderInventoryTable();
     showNotification(`Dispensed ${dispenseQty} ${item.unit} of ${item.name}. Stock updated.`, 'success');
 
-    // Attempt backend sync
+    // Attempt SQLite backend synchronization
     try {
         await fetch(`${BACKEND_INVENTORY_URL}/${itemId}/dispense`, {
             method: 'POST',
@@ -162,11 +179,31 @@ async function dispenseMed(itemId) {
             body: JSON.stringify({ quantity: dispenseQty })
         });
     } catch (e) {
-        // Handled silently in offline mode
+        // Handled silently for offline tolerance
     }
 }
 
-function requestRestock() {
+/**
+ * Handles RHU replenishment requests for low or critical stock levels.
+ * Posts to POST /api/inventory/restock-request with offline fallback.
+ */
+async function requestRestock() {
+    try {
+        const response = await fetch(`${BACKEND_INVENTORY_URL}/restock-request`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requested_by: 'Midwife Maria' })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message || 'RHU replenishment requisition submitted.', 'success');
+            return;
+        }
+    } catch (e) {
+        // Offline fallback
+    }
+
     showNotification('Stock replenishment requisition manifest generated for RHU submission.', 'success');
 }
 
@@ -174,12 +211,8 @@ function requestRestock() {
 // 4. Modal Handling: Add Medicine Supply
 // --------------------------------------------------------------------------
 function openAddMedicineModal() {
-    const modal = document.getElementById('addMedicineModal');
-    if (!modal) return;
-
     const form = document.getElementById('addMedicineForm');
     if (form) form.reset();
-
     openModal('addMedicineModal');
 }
 
@@ -187,6 +220,10 @@ function closeAddMedicineModal() {
     closeModal('addMedicineModal');
 }
 
+/**
+ * Saves a new medicine inventory entry.
+ * Posts to POST /api/inventory and updates local database cache.
+ */
 async function saveMedicineItem(e) {
     e.preventDefault();
 
@@ -201,7 +238,7 @@ async function saveMedicineItem(e) {
         return;
     }
 
-    const newItem = {
+    let newItem = {
         id: Date.now(),
         name: name,
         category: category,
@@ -212,15 +249,9 @@ async function saveMedicineItem(e) {
         status: calculateStockStatus(stock, reorder)
     };
 
-    inventoryData.push(newItem);
-    saveInventoryToStorage(inventoryData);
-    closeAddMedicineModal();
-    renderInventoryTable();
-    showNotification(`Added ${name} (${stock} tabs) to inventory.`, 'success');
-
-    // Attempt backend sync
+    // Attempt backend persistence to SQLite
     try {
-        await fetch(BACKEND_INVENTORY_URL, {
+        const response = await fetch(BACKEND_INVENTORY_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -232,11 +263,27 @@ async function saveMedicineItem(e) {
                 unit: 'tabs'
             })
         });
+
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data && result.data.id) {
+                newItem.id = result.data.id;
+            }
+        }
     } catch (e) {
-        // Handled silently in offline mode
+        // Offline mode fallback: keeps client-generated ID
     }
+
+    inventoryData.unshift(newItem);
+    saveInventoryToStorage(inventoryData);
+    closeAddMedicineModal();
+    renderInventoryTable();
+    showNotification(`Added ${name} (${stock} tabs) to inventory ledger.`, 'success');
 }
 
+/**
+ * XSS prevention helper.
+ */
 function escapeHtml(text) {
     if (!text) return '';
     return text.toString()

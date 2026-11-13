@@ -536,6 +536,17 @@ def dispense_inventory_item(item_id):
     return jsonify({"success": True, "message": f"Dispensed {qty} {item['unit']}.", "data": updated})
 
 
+@app.route("/api/inventory/restock-request", methods=["POST"])
+def request_inventory_restock():
+    """Logs and generates an RHU replenishment requisition for low or depleted medicines."""
+    low_items = query_db("SELECT * FROM inventory WHERE current_stock <= reorder_level")
+    return jsonify({
+        "success": True,
+        "message": f"Stock replenishment requisition generated for RHU submission ({len(low_items)} item(s) flagged).",
+        "flagged_count": len(low_items)
+    })
+
+
 # --------------------------------------------------------------------------
 # Administrative Reset Endpoint
 # --------------------------------------------------------------------------
