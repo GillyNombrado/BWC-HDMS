@@ -91,7 +91,7 @@
                         <i class="bi bi-check-circle-fill" id="toastIcon"></i>
                         <span id="toastMessage">Action completed successfully.</span>
                     </div>
-                    <button type="button" class="toast-close-btn" onclick="hideToast()" aria-label="Close">&times;</button>
+                    <button type="button" class="toast-close-btn" onclick="hideToast()" aria-label="Close">×</button>
                 </div>
             </div>
 
@@ -111,10 +111,88 @@
                 </div>
             </div>
 
+            <!-- Inventory Summary Metric Cards (NEW) -->
+            <div class="row g-3 mb-4" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <div class="card-custom" style="flex: 1; min-width: 200px; padding: 1.25rem;">
+                    <div class="d-flex justify-between align-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">Total Items</span>
+                            <h3 id="statTotalItems" style="font-size: 1.5rem; font-weight: 700; margin-top: 0.2rem; margin-bottom: 0;">0</h3>
+                        </div>
+                        <div style="background: rgba(13, 110, 253, 0.1); color: var(--bs-primary, #0d6efd); padding: 0.75rem; border-radius: 8px;">
+                            <i class="bi bi-capsule" style="font-size: 1.25rem;"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-custom" style="flex: 1; min-width: 200px; padding: 1.25rem;">
+                    <div class="d-flex justify-between align-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">Adequate Stock</span>
+                            <h3 id="statAdequate" style="font-size: 1.5rem; font-weight: 700; margin-top: 0.2rem; margin-bottom: 0; color: #198754;">0</h3>
+                        </div>
+                        <div style="background: rgba(25, 135, 84, 0.1); color: #198754; padding: 0.75rem; border-radius: 8px;">
+                            <i class="bi bi-check-circle" style="font-size: 1.25rem;"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-custom" style="flex: 1; min-width: 200px; padding: 1.25rem;">
+                    <div class="d-flex justify-between align-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">Low Stock Warnings</span>
+                            <h3 id="statLowStock" style="font-size: 1.5rem; font-weight: 700; margin-top: 0.2rem; margin-bottom: 0; color: #ffc107;">0</h3>
+                        </div>
+                        <div style="background: rgba(255, 193, 7, 0.1); color: #ffc107; padding: 0.75rem; border-radius: 8px;">
+                            <i class="bi bi-exclamation-triangle" style="font-size: 1.25rem;"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-custom" style="flex: 1; min-width: 200px; padding: 1.25rem;">
+                    <div class="d-flex justify-between align-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">Critical / Depleted</span>
+                            <h3 id="statCritical" style="font-size: 1.5rem; font-weight: 700; margin-top: 0.2rem; margin-bottom: 0; color: #dc3545;">0</h3>
+                        </div>
+                        <div style="background: rgba(220, 53, 69, 0.1); color: #dc3545; padding: 0.75rem; border-radius: 8px;">
+                            <i class="bi bi-shield-exclamation" style="font-size: 1.25rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search and Filter Controls Bar -->
+            <div class="card-custom mb-3" style="padding: 1rem 1.25rem;">
+                <div class="d-flex gap-3" style="flex-wrap: wrap;">
+                    <div style="flex: 2; min-width: 220px;">
+                        <div class="input-group" style="position: relative;">
+                            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #6c757d); z-index: 5;">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" id="inventorySearchInput" class="form-control" placeholder="Search by medicine name, category, or batch..." style="padding-left: 35px;">
+                        </div>
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                        <select id="inventoryCategoryFilter" class="form-select">
+                            <option value="">All Categories</option>
+                            <option value="Antihypertensive">Antihypertensive (HPN Maintenance)</option>
+                            <option value="Anti-diabetic">Anti-diabetic (DM Maintenance)</option>
+                            <option value="Statin / Lipid-lowering">Statin / Lipid-lowering</option>
+                            <option value="Cardiovascular">Cardiovascular Support</option>
+                            <option value="Emergency Supply">Emergency Supply</option>
+                            <option value="Analgesic">Analgesic / Antipyretic</option>
+                            <option value="Vitamin">Vitamin / Supplement</option>
+                            <option value="Supplies">Diagnostic / Medical Supplies</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <!-- Inventory Table Card -->
             <div class="card-custom">
                 <div class="card-body-no-padding">
-                    <div class="table-responsive">
+                    <div class="table-responsive table-responsive-inventory">
                         <table class="custom-table" id="inventoryTable">
                             <thead>
                                 <tr>
@@ -144,57 +222,111 @@
     </div>
 
     <!-- =========================================================================
-         Add Medicine Stock Modal
+         Add Medicine Stock Modal (Aligned with Register New Patient UI)
          ========================================================================= -->
-    <div class="modal-backdrop-custom hidden" id="addMedicineModal">
-        <div class="modal-dialog-box modal-dialog-md">
-            <div class="modal-header-custom">
+    <div class="modal-overlay hidden" id="addMedicineModal" role="dialog" aria-modal="true">
+        <div class="modal-dialog-box modal-dialog-lg" style="max-width: 680px;">
+            <div class="modal-header-custom" style="border-bottom: 1px solid var(--border-color);">
                 <div>
                     <h5 class="modal-title-custom">
-                        <i class="bi bi-capsule-pill text-primary me-2"></i>Add Medicine Supply
+                        <i class="bi bi-capsule-pill text-primary me-2"></i> Add Medicine Supply
                     </h5>
-                    <p class="text-muted mb-0" style="font-size: 0.8rem;">Register incoming maintenance medicine stock</p>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">Register incoming maintenance medicine stock & RHU inventory supplies</p>
                 </div>
                 <button type="button" class="modal-close-btn" onclick="closeAddMedicineModal()">&times;</button>
             </div>
             <div class="modal-body-custom">
                 <form id="addMedicineForm" onsubmit="saveMedicineItem(event)">
-                    <div class="form-group">
-                        <label class="form-label" for="medName">Medicine Name & Formulation <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="medName" placeholder="e.g. Losartan 50mg Tablet" required>
+                    
+                    <!-- 1. Medicine Identification & Classification -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-capsule text-primary me-2"></i>
+                        <span>Medicine Identification & Classification</span>
+                    </div>
+                    <p class="section-help-text mb-3">Specify medicine brand/generic name, formulation strength, and clinical category.</p>
+
+                    <div class="grid-2-col mb-3">
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="medName">Medicine Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="medName" placeholder="e.g., Losartan, Metformin, Amlodipine" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="medDosage">Dosage / Formulation</label>
+                            <input type="text" class="form-control" id="medDosage" placeholder="e.g., 50mg Tablet, 500mg, 10ml Vial">
+                        </div>
                     </div>
 
-                    <div class="grid-2-col mb-2">
+                    <div class="form-group mb-3">
+                        <label class="form-label" for="medCategory">Therapeutic Category <span class="text-danger">*</span></label>
+                        <select class="form-select" id="medCategory" required>
+                            <option value="" disabled selected>Select Medicine Category</option>
+                            <option value="Antihypertensive">Antihypertensive (HPN Maintenance)</option>
+                            <option value="Anti-diabetic">Anti-diabetic (DM Maintenance)</option>
+                            <option value="Statin / Lipid-lowering">Statin / Lipid-lowering</option>
+                            <option value="Cardiovascular">Cardiovascular Support</option>
+                            <option value="Emergency Supply">Emergency Supply</option>
+                            <option value="Analgesic">Analgesic / Antipyretic</option>
+                            <option value="Vitamin">Vitamin / Supplement</option>
+                            <option value="Supplies">Diagnostic / Medical Supplies</option>
+                        </select>
+                    </div>
+
+                    <hr class="form-field-divider">
+
+                    <!-- 2. Stock Balance & Inventory Thresholds -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-boxes text-primary me-2"></i>
+                        <span>Stock Balance & Packaging Details</span>
+                    </div>
+                    <p class="section-help-text mb-3">Set intake stock quantity, packaging unit, and automated low-stock alert threshold.</p>
+
+                    <div class="grid-3-equal mb-3">
                         <div class="form-group mb-0">
-                            <label class="form-label" for="medCategory">Category <span class="text-danger">*</span></label>
-                            <select class="form-select" id="medCategory" required>
-                                <option value="Antihypertensive">Antihypertensive</option>
-                                <option value="Anti-diabetic">Anti-diabetic</option>
-                                <option value="Statin / Lipid-lowering">Statin / Lipid-lowering</option>
-                                <option value="Emergency Supply">Emergency Supply</option>
+                            <label class="form-label" for="medStock">Initial Stock <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="medStock" placeholder="e.g., 100" min="0" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="medUnit">Packaging Unit <span class="text-danger">*</span></label>
+                            <select class="form-select" id="medUnit" required>
+                                <option value="tabs" selected>Tablets (tabs)</option>
+                                <option value="caps">Capsules (caps)</option>
+                                <option value="vials">Vials (vials)</option>
+                                <option value="boxes">Boxes (boxes)</option>
+                                <option value="pcs">Pieces (pcs)</option>
+                                <option value="bottles">Bottles (bottles)</option>
                             </select>
                         </div>
                         <div class="form-group mb-0">
-                            <label class="form-label" for="medBatch">Batch / Lot Number</label>
-                            <input type="text" class="form-control" id="medBatch" placeholder="e.g. LOT-2026-A">
+                            <label class="form-label" for="medReorder">Reorder Level <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="medReorder" value="20" min="1" required>
                         </div>
                     </div>
+
+                    <hr class="form-field-divider">
+
+                    <!-- 3. Batch Number & Expiration Tracking -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-calendar-check text-primary me-2"></i>
+                        <span>Batch & Expiration Tracking</span>
+                    </div>
+                    <p class="section-help-text mb-3">Record RHU shipment lot designation and expiration date for quality and safety compliance.</p>
 
                     <div class="grid-2-col mb-4">
                         <div class="form-group mb-0">
-                            <label class="form-label" for="medStock">Initial Stock Quantity <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="medStock" placeholder="e.g. 100" min="0" required>
+                            <label class="form-label" for="medBatch">Batch / Lot Number</label>
+                            <input type="text" class="form-control" id="medBatch" placeholder="e.g., LOT-2026-A">
                         </div>
                         <div class="form-group mb-0">
-                            <label class="form-label" for="medReorder">Reorder Threshold Level</label>
-                            <input type="number" class="form-control" id="medReorder" value="20" min="1">
+                            <label class="form-label" for="medExpiry">Expiration Date</label>
+                            <input type="date" class="form-control" id="medExpiry">
                         </div>
                     </div>
 
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary py-2" style="flex: 1;" onclick="closeAddMedicineModal()">Cancel</button>
-                        <button type="submit" class="btn btn-primary py-2" style="flex: 2;">
-                            <i class="bi bi-save me-1"></i> Save Medicine Item
+                    <!-- Modal Action Footer Buttons -->
+                    <div class="d-flex gap-2 pt-3" style="border-top: 1px solid var(--border-color);">
+                        <button type="button" class="btn btn-outline-secondary py-2.5 fw-semibold" style="flex: 1;" onclick="closeAddMedicineModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary py-2.5 fw-semibold" style="flex: 2;">
+                            <i class="bi bi-check-lg me-1"></i> Save to Inventory
                         </button>
                     </div>
                 </form>

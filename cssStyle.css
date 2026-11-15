@@ -549,6 +549,10 @@ button, input, select, textarea {
     overflow-x: auto;
 }
 
+.table-responsive-inventory {
+    max-height: 560px;
+}
+
 .table-responsive::-webkit-scrollbar {
     width: 6px;
     height: 6px;

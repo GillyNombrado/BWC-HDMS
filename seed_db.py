@@ -316,17 +316,17 @@ def seed_data(force=False):
         # 3. Seed Inventory items
         print("[DB Seed] Seeding medicine inventory items...")
         inventory_items = [
-            Inventory(item_name="Losartan 50mg Tablet", category="Antihypertensive", quantity=250, current_stock=250, expiration_date=date(2027, 8, 15), dosage="50mg", unit="tabs", status="Adequate", batch_no="LOT-2026-01"),
-            Inventory(item_name="Amlodipine 10mg Tablet", category="Antihypertensive", quantity=200, current_stock=200, expiration_date=date(2027, 6, 30), dosage="10mg", unit="tabs", status="Adequate", batch_no="LOT-2026-02"),
-            Inventory(item_name="Metoprolol 50mg Tablet", category="Antihypertensive", quantity=150, current_stock=150, expiration_date=date(2027, 5, 20), dosage="50mg", unit="tabs", status="Adequate", batch_no="LOT-2026-03"),
-            Inventory(item_name="Clopidogrel 75mg Tablet", category="Cardiovascular", quantity=120, current_stock=120, expiration_date=date(2027, 9, 10), dosage="75mg", unit="tabs", status="Adequate", batch_no="LOT-2026-04"),
-            Inventory(item_name="Metformin 500mg Tablet", category="Anti-Diabetic", quantity=300, current_stock=300, expiration_date=date(2027, 10, 12), dosage="500mg", unit="tabs", status="Adequate", batch_no="LOT-2026-05"),
-            Inventory(item_name="Gliclazide 80mg Tablet", category="Anti-Diabetic", quantity=180, current_stock=180, expiration_date=date(2027, 7, 25), dosage="80mg", unit="tabs", status="Adequate", batch_no="LOT-2026-06"),
-            Inventory(item_name="Insulin Regular (Human) Vial", category="Anti-Diabetic", quantity=25, current_stock=25, expiration_date=date(2026, 12, 31), dosage="10ml", unit="vials", status="Adequate", batch_no="LOT-2026-07"),
-            Inventory(item_name="Blood Glucose Test Strips (Box of 50)", category="Diagnostic", quantity=15, current_stock=15, expiration_date=date(2027, 4, 10), dosage="N/A", unit="boxes", status="Low", batch_no="LOT-2026-08"),
-            Inventory(item_name="Paracetamol 500mg Tablet", category="Analgesic", quantity=500, current_stock=500, expiration_date=date(2028, 1, 15), dosage="500mg", unit="tabs", status="Adequate", batch_no="LOT-2026-09"),
-            Inventory(item_name="Vitamin C 500mg Ascorbic Acid", category="Vitamin", quantity=400, current_stock=400, expiration_date=date(2028, 3, 30), dosage="500mg", unit="tabs", status="Adequate", batch_no="LOT-2026-10"),
-            Inventory(item_name="Disposable Syringes 3ml", category="Supplies", quantity=300, current_stock=300, expiration_date=date(2028, 6, 1), dosage="3ml", unit="pcs", status="Adequate", batch_no="LOT-2026-11")
+            Inventory(item_name="Losartan", category="Antihypertensive", quantity=250, current_stock=250, expiration_date=date(2027, 8, 15), dosage="50mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-01"),
+            Inventory(item_name="Amlodipine", category="Antihypertensive", quantity=200, current_stock=200, expiration_date=date(2027, 6, 30), dosage="10mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-02"),
+            Inventory(item_name="Metoprolol", category="Antihypertensive", quantity=150, current_stock=150, expiration_date=date(2027, 5, 20), dosage="50mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-03"),
+            Inventory(item_name="Clopidogrel", category="Cardiovascular", quantity=120, current_stock=120, expiration_date=date(2027, 9, 10), dosage="75mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-04"),
+            Inventory(item_name="Metformin", category="Anti-diabetic", quantity=300, current_stock=300, expiration_date=date(2027, 10, 12), dosage="500mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-05"),
+            Inventory(item_name="Gliclazide", category="Anti-diabetic", quantity=180, current_stock=180, expiration_date=date(2027, 7, 25), dosage="80mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-06"),
+            Inventory(item_name="Insulin Regular", category="Anti-diabetic", quantity=25, current_stock=25, expiration_date=date(2026, 12, 31), dosage="10ml Vial", unit="vials", status="Adequate", batch_no="LOT-2026-07"),
+            Inventory(item_name="Blood Glucose Test Strips", category="Supplies", quantity=15, current_stock=15, expiration_date=date(2027, 4, 10), dosage="Box of 50", unit="boxes", status="Low", batch_no="LOT-2026-08"),
+            Inventory(item_name="Paracetamol", category="Analgesic", quantity=500, current_stock=500, expiration_date=date(2028, 1, 15), dosage="500mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-09"),
+            Inventory(item_name="Vitamin C", category="Vitamin", quantity=400, current_stock=400, expiration_date=date(2028, 3, 30), dosage="500mg Ascorbic Acid", unit="tabs", status="Adequate", batch_no="LOT-2026-10"),
+            Inventory(item_name="Disposable Syringes", category="Supplies", quantity=300, current_stock=300, expiration_date=date(2028, 6, 1), dosage="3ml", unit="pcs", status="Adequate", batch_no="LOT-2026-11")
         ]
 
         for item in inventory_items:
@@ -338,8 +338,8 @@ def seed_data(force=False):
         random.seed(42)
         bp_list = ["120/80", "130/85", "118/78", "140/90", "125/82", "135/88", "115/75", "142/91"]
 
-        losartan_item = Inventory.query.filter_by(item_name="Losartan 50mg Tablet").first()
-        metformin_item = Inventory.query.filter_by(item_name="Metformin 500mg Tablet").first()
+        losartan_item = Inventory.query.filter_by(item_name="Losartan").first()
+        metformin_item = Inventory.query.filter_by(item_name="Metformin").first()
 
         for patient in inserted_patients:
             # Baseline Vitals

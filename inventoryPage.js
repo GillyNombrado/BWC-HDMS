@@ -2,30 +2,21 @@
    Barangay Wellness Circle: Hypertension & Diabetes Management System (BWC-HDMS)
    Capstone Project - CMSC 309
    Module: Medicine Inventory & Dispensing Ledger (inventoryPage.js)
-   ==========================================================================
-   Description:
-   Handles medicine inventory tracking with a clean-slate architecture:
-   1. Zero static or seed mock data (initializes with empty state []).
-   2. Offline-First data synchronization with Flask / SQLite backend or LocalStorage.
-   3. Dynamic rendering of stock balances, low-stock thresholds, and status badges.
-   4. Live dispensing actions (deducts maintenance supply & syncs to ledger).
-   5. Requisition action handler for RHU replenishment requests.
-   6. Supply intake modal for registering new RHU medicine shipments.
    ========================================================================== */
 
 const STORAGE_KEY_INVENTORY = 'bwc_inventory_db';
 const BACKEND_INVENTORY_URL = 'http://127.0.0.1:5000/api/inventory';
 
-// In-memory inventory list (Zero static/mock data - initializes clean)
+// In-memory inventory list
 let inventoryData = [];
 
+// Search & Filter State variables
+let currentSearchQuery = '';
+let currentCategoryFilter = '';
+
 // --------------------------------------------------------------------------
-// 1. Data Synchronization & Persistence Layer (Database-Ready)
+// 1. Data Synchronization & Persistence Layer
 // --------------------------------------------------------------------------
-/**
- * Loads medicine inventory from Flask/SQLite backend or fallback LocalStorage.
- * Initializes with an empty array if unseeded or offline.
- */
 async function loadInventory() {
     try {
         const controller = new AbortController();
@@ -49,14 +40,14 @@ async function loadInventory() {
                 }));
                 localStorage.setItem(STORAGE_KEY_INVENTORY, JSON.stringify(inventoryData));
                 renderInventoryTable();
+                updateSummaryStats();
                 return;
             }
         }
     } catch (e) {
-        // Fallback silently to offline localStorage if Flask backend is offline
+        // Fallback silently to offline localStorage
     }
 
-    // Retrieve from client localStorage or initialize clean empty state
     const raw = localStorage.getItem(STORAGE_KEY_INVENTORY);
     if (raw) {
         try {
@@ -69,72 +60,107 @@ async function loadInventory() {
     }
 
     renderInventoryTable();
+    updateSummaryStats();
 }
 
-/**
- * Saves current in-memory inventory array to LocalStorage.
- */
 function saveInventoryToStorage(data) {
     localStorage.setItem(STORAGE_KEY_INVENTORY, JSON.stringify(data));
 }
 
-/**
- * Computes clinical inventory stock status based on current quantity vs reorder threshold.
- */
 function calculateStockStatus(stock, reorderLevel = 20) {
     const s = parseInt(stock, 10);
     const r = parseInt(reorderLevel, 10);
+    if (s <= 0) return 'Depleted';
     if (s <= 10) return 'Critical Low';
     if (s <= r) return 'Low Stock';
     return 'Adequate';
 }
 
 // --------------------------------------------------------------------------
-// 2. Dynamic Table Rendering & Clean Empty State Handling
+// 2. Summary Statistics Counter Calculator
 // --------------------------------------------------------------------------
-/**
- * Dynamically renders the inventory table body or shows a clean zero-state alert.
- */
+function updateSummaryStats() {
+    const total = inventoryData.length;
+    let adequate = 0;
+    let lowStock = 0;
+    let critical = 0;
+
+    inventoryData.forEach(item => {
+        const status = calculateStockStatus(item.stock, item.reorderLevel);
+        if (status === 'Adequate') adequate++;
+        else if (status === 'Low Stock') lowStock++;
+        else critical++; // Critical Low or Depleted
+    });
+
+    const elTotal = document.getElementById('statTotalItems');
+    const elAdequate = document.getElementById('statAdequate');
+    const elLow = document.getElementById('statLowStock');
+    const elCritical = document.getElementById('statCritical');
+
+    if (elTotal) elTotal.textContent = total;
+    if (elAdequate) elAdequate.textContent = adequate;
+    if (elLow) elLow.textContent = lowStock;
+    if (elCritical) elCritical.textContent = critical;
+}
+
+// --------------------------------------------------------------------------
+// 3. Dynamic Table Rendering with Enhanced Visual Badges
+// --------------------------------------------------------------------------
 function renderInventoryTable() {
     const tbody = document.getElementById('inventoryTableBody');
     if (!tbody) return;
 
     tbody.innerHTML = '';
 
-    // Clean empty state (unseeded database or zero records)
-    if (!inventoryData || inventoryData.length === 0) {
+    const filteredData = inventoryData.filter(item => {
+        const matchesSearch = 
+            (item.name && item.name.toLowerCase().includes(currentSearchQuery)) ||
+            (item.category && item.category.toLowerCase().includes(currentSearchQuery)) ||
+            (item.batchNo && item.batchNo.toLowerCase().includes(currentSearchQuery));
+        
+        const matchesCategory = !currentCategoryFilter || item.category === currentCategoryFilter;
+
+        return matchesSearch && matchesCategory;
+    });
+
+    if (!filteredData || filteredData.length === 0) {
+        const isSearching = currentSearchQuery !== '' || currentCategoryFilter !== '';
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" class="text-center py-5 text-muted">
                     <i class="bi bi-capsule d-block mb-2" style="font-size: 2rem; opacity: 0.5;"></i>
-                    <span class="fw-semibold" style="font-size: 0.95rem;">No medicine inventory records found or unseeded.</span>
-                    <p class="text-muted mb-0" style="font-size: 0.8rem; margin-top: 0.25rem;">Click "Add Medicine Supply" above to record initial stocks or log an RHU delivery.</p>
+                    <span class="fw-semibold" style="font-size: 0.95rem;">${isSearching ? 'No matching medicine records found.' : 'No medicine inventory records found or unseeded.'}</span>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem; margin-top: 0.25rem;">${isSearching ? 'Try adjusting your search query or category filter.' : 'Click "Add Medicine Supply" above to record initial stocks or log an RHU delivery.'}</p>
                 </td>
             </tr>
         `;
         return;
     }
 
-    // Populate inventory records
-    inventoryData.forEach(item => {
+    filteredData.forEach(item => {
         const row = document.createElement('tr');
+        const currentStatus = calculateStockStatus(item.stock, item.reorderLevel);
 
-        // Status badge styling based on stock health
-        let statusBadge = '<span class="badge badge-success">Adequate</span>';
+        // Enhanced Visual Status Badges
+        let statusBadge = '<span class="badge bg-success text-white px-2 py-1"><i class="bi bi-check-circle me-1"></i>Adequate</span>';
         let stockClass = 'text-success';
-        if (item.status === 'Critical Low' || item.stock <= 10) {
-            statusBadge = '<span class="badge badge-danger">Critical Low</span>';
-            stockClass = 'text-danger';
-        } else if (item.status === 'Low Stock' || item.stock <= item.reorderLevel) {
-            statusBadge = '<span class="badge badge-warning">Low Stock</span>';
-            stockClass = 'text-warning';
+
+        if (currentStatus === 'Depleted' || item.stock <= 0) {
+            statusBadge = '<span class="badge bg-dark text-white px-2 py-1"><i class="bi bi-x-circle me-1"></i>Depleted</span>';
+            stockClass = 'text-muted text-decoration-line-through';
+        } else if (currentStatus === 'Critical Low' || item.stock <= 10) {
+            statusBadge = '<span class="badge bg-danger text-white px-2 py-1 animate-pulse"><i class="bi bi-exclamation-octagon-fill me-1"></i>Critical Low</span>';
+            stockClass = 'text-danger fw-bold';
+        } else if (currentStatus === 'Low Stock' || item.stock <= item.reorderLevel) {
+            statusBadge = '<span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>Low Stock</span>';
+            stockClass = 'text-warning fw-semibold';
         }
 
         row.innerHTML = `
             <td class="ps-4 fw-semibold">${escapeHtml(item.name)}</td>
             <td>${escapeHtml(item.category || 'General')}</td>
             <td class="text-muted" style="font-family: monospace;">${escapeHtml(item.batchNo || 'N/A')}</td>
-            <td><span class="fw-bold ${stockClass}">${item.stock} ${escapeHtml(item.unit || 'tabs')}</span></td>
+            <td><span class="${stockClass}">${item.stock} ${escapeHtml(item.unit || 'tabs')}</span></td>
             <td>${statusBadge}</td>
             <td class="text-right pe-4">
                 <button class="btn btn-sm btn-outline-primary" onclick="dispenseMed(${item.id})" ${item.stock <= 0 ? 'disabled' : ''}>
@@ -148,12 +174,8 @@ function renderInventoryTable() {
 }
 
 // --------------------------------------------------------------------------
-// 3. Dispensing & Stock Deduction
+// 4. Dispensing & Stock Deduction
 // --------------------------------------------------------------------------
-/**
- * Handles dispensing a standard monthly maintenance ration (up to 30 tabs).
- * Updates local cache and syncs with backend endpoint POST /api/inventory/<id>/dispense.
- */
 async function dispenseMed(itemId) {
     const item = inventoryData.find(m => m.id === itemId);
     if (!item) return;
@@ -169,9 +191,9 @@ async function dispenseMed(itemId) {
 
     saveInventoryToStorage(inventoryData);
     renderInventoryTable();
+    updateSummaryStats();
     showNotification(`Dispensed ${dispenseQty} ${item.unit} of ${item.name}. Stock updated.`, 'success');
 
-    // Attempt SQLite backend synchronization
     try {
         await fetch(`${BACKEND_INVENTORY_URL}/${itemId}/dispense`, {
             method: 'POST',
@@ -179,14 +201,10 @@ async function dispenseMed(itemId) {
             body: JSON.stringify({ quantity: dispenseQty })
         });
     } catch (e) {
-        // Handled silently for offline tolerance
+        // Offline tolerance
     }
 }
 
-/**
- * Handles RHU replenishment requests for low or critical stock levels.
- * Posts to POST /api/inventory/restock-request with offline fallback.
- */
 async function requestRestock() {
     try {
         const response = await fetch(`${BACKEND_INVENTORY_URL}/restock-request`, {
@@ -208,7 +226,7 @@ async function requestRestock() {
 }
 
 // --------------------------------------------------------------------------
-// 4. Modal Handling: Add Medicine Supply
+// 5. Modal Handling: Add Medicine Supply
 // --------------------------------------------------------------------------
 function openAddMedicineModal() {
     const form = document.getElementById('addMedicineForm');
@@ -220,18 +238,17 @@ function closeAddMedicineModal() {
     closeModal('addMedicineModal');
 }
 
-/**
- * Saves a new medicine inventory entry.
- * Posts to POST /api/inventory and updates local database cache.
- */
 async function saveMedicineItem(e) {
     e.preventDefault();
 
     const name = document.getElementById('medName').value.trim();
+    const dosage = document.getElementById('medDosage') ? document.getElementById('medDosage').value.trim() : '';
     const category = document.getElementById('medCategory').value;
     const batch = document.getElementById('medBatch').value.trim() || 'LOT-' + new Date().getFullYear();
     const stock = parseInt(document.getElementById('medStock').value, 10) || 0;
+    const unit = document.getElementById('medUnit') ? document.getElementById('medUnit').value : 'tabs';
     const reorder = parseInt(document.getElementById('medReorder').value, 10) || 20;
+    const expiry = document.getElementById('medExpiry') ? document.getElementById('medExpiry').value : null;
 
     if (!name) {
         showNotification('Please enter a medicine name.', 'danger');
@@ -243,13 +260,14 @@ async function saveMedicineItem(e) {
         name: name,
         category: category,
         batchNo: batch,
+        dosage: dosage,
         stock: stock,
-        unit: 'tabs',
+        unit: unit,
         reorderLevel: reorder,
+        expirationDate: expiry,
         status: calculateStockStatus(stock, reorder)
     };
 
-    // Attempt backend persistence to SQLite
     try {
         const response = await fetch(BACKEND_INVENTORY_URL, {
             method: 'POST',
@@ -258,9 +276,11 @@ async function saveMedicineItem(e) {
                 item_name: name,
                 category: category,
                 batch_no: batch,
+                dosage: dosage,
                 current_stock: stock,
                 reorder_level: reorder,
-                unit: 'tabs'
+                unit: unit,
+                expiration_date: expiry
             })
         });
 
@@ -271,32 +291,46 @@ async function saveMedicineItem(e) {
             }
         }
     } catch (e) {
-        // Offline mode fallback: keeps client-generated ID
+        // Offline fallback
     }
 
     inventoryData.unshift(newItem);
     saveInventoryToStorage(inventoryData);
     closeAddMedicineModal();
     renderInventoryTable();
-    showNotification(`Added ${name} (${stock} tabs) to inventory ledger.`, 'success');
+    updateSummaryStats();
+    showNotification(`Added ${name} (${stock} ${unit}) to inventory ledger.`, 'success');
 }
 
-/**
- * XSS prevention helper.
- */
 function escapeHtml(text) {
-    if (!text) return '';
-    return text.toString()
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
+        if (!text) return '';
+        return text.toString()
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 
 // --------------------------------------------------------------------------
-// 5. Page Initialization
+// 6. Page Initialization
 // --------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
     loadInventory();
+
+    const searchInput = document.getElementById('inventorySearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            currentSearchQuery = e.target.value.toLowerCase().trim();
+            renderInventoryTable();
+        });
+    }
+
+    const categorySelect = document.getElementById('inventoryCategoryFilter');
+    if (categorySelect) {
+        categorySelect.addEventListener('change', (e) => {
+            currentCategoryFilter = e.target.value;
+            renderInventoryTable();
+        });
+    }
 });
