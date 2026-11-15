@@ -110,11 +110,42 @@
                     </div>
                     <div class="card-body-custom">
                         <form id="consultForm" onsubmit="submitConsultation(event)">
-                            <div class="form-group">
-                                <label class="form-label" for="consultPatient">Select Patient</label>
+                            <div class="form-group mb-3">
+                                <div class="d-flex justify-between align-center mb-1">
+                                    <label class="form-label mb-0" for="consultPatient">Select Patient</label>
+                                    <span id="autoLoadedIndicator" class="badge badge-success hidden" style="font-size: 0.72rem;">
+                                        <i class="bi bi-check-circle-fill me-1"></i>Auto-Selected from TCR
+                                    </span>
+                                </div>
                                 <select class="form-select" id="consultPatient" required>
                                     <option value="">Choose registered patient...</option>
                                 </select>
+                            </div>
+
+                            <!-- Patient Information Preview Card -->
+                            <div id="patientInfoCard" class="card-custom mb-3 p-3 hidden" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px;">
+                                <div class="d-flex justify-between align-center mb-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <i class="bi bi-person-circle text-primary" style="font-size: 1.35rem;"></i>
+                                        <div>
+                                            <span class="fw-bold text-primary" id="dispPatientName" style="font-size: 1rem;">-</span>
+                                            <span class="text-muted ms-2" style="font-size: 0.78rem;">(PhilHealth ID: <span id="dispPatientPhId" class="fw-semibold text-secondary">-</span>)</span>
+                                        </div>
+                                    </div>
+                                    <span class="badge" id="dispPatientCondition" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.78rem;">-</span>
+                                </div>
+
+                                <div class="grid-3-col mb-2" style="gap: 0.5rem; font-size: 0.8rem;">
+                                    <div><span class="text-muted">Age / Sex:</span> <strong id="dispPatientAgeSex">-</strong></div>
+                                    <div><span class="text-muted">Purok:</span> <strong id="dispPatientPurok">-</strong></div>
+                                    <div><span class="text-muted">Emergency Contact:</span> <strong id="dispPatientEmergency">-</strong></div>
+                                </div>
+
+                                <div class="pt-2 border-top" style="border-color: var(--border-color) !important; font-size: 0.78rem;">
+                                    <div class="mb-1"><span class="text-muted">Address:</span> <span id="dispPatientAddress" class="fw-medium">-</span></div>
+                                    <div id="dispPatientProgramsRow" class="mb-1 hidden"><span class="text-muted">Enrolled Programs:</span> <span id="dispPatientPrograms" class="fw-medium"></span></div>
+                                    <div id="dispPatientAllergiesRow" class="hidden"><span class="text-muted">Known Allergies / Risks:</span> <span id="dispPatientAllergies" class="text-danger fw-semibold"></span></div>
+                                </div>
                             </div>
 
                             <div class="grid-2-col mb-2">

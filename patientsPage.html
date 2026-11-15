@@ -122,15 +122,14 @@
                         </select>
                     </div>
                     <div>
-                        <select class="form-select" id="filterPurok" onchange="filterTCR()">
-                            <option value="">All Puroks</option>
-                            <option value="Purok 1">Purok 1</option>
-                            <option value="Purok 2">Purok 2</option>
-                            <option value="Purok 3">Purok 3</option>
-                            <option value="Purok 4">Purok 4</option>
-                            <option value="Purok 5">Purok 5</option>
-                            <option value="Purok 6">Purok 6</option>
-                            <option value="Purok 7">Purok 7</option>
+                        <select class="form-select" id="filterPatientSort" onchange="filterTCR()">
+                            <option value="">All Patients</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Adult">Adult</option>
+                            <option value="Underage">Underage</option>
+                            <option value="Risk (High to Low)">Risk (High to Low)</option>
+                            <option value="Risk (Low to High)">Risk (Low to High)</option>
                         </select>
                     </div>
                 </div>
@@ -153,7 +152,6 @@
                                 </tr>
                             </thead>
                             <tbody id="tcrTableBody">
-                                <!-- Dynamically populated by patientsPage.js with clean empty state -->
                             </tbody>
                         </table>
                     </div>
@@ -570,6 +568,7 @@
     </div>
 
     <!-- Scripts -->
+    <script src="api.js"></script>
     <script src="shared.js"></script>
     <script src="patientsPage.js"></script>
 </body>

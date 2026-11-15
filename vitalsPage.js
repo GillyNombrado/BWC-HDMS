@@ -15,68 +15,235 @@ const STORAGE_KEY_APPOINTMENTS = 'bwc_appointments_db';
 const BACKEND_CONSULT_URL = 'http://127.0.0.1:5000/api/consultations';
 const BACKEND_PATIENTS_URL = 'http://127.0.0.1:5000/api/patients';
 
+let registeredPatientsList = [];
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Populate registered patients dropdown
     await populateRegisteredPatients();
 
-    // If a patient was selected via "quickPrescribe" from TCR or Schedule, auto-select them
-    const preselected = sessionStorage.getItem('consult_patient');
-    if (preselected) {
-        const select = document.getElementById('consultPatient');
-        if (select) {
-            let matched = false;
-            for (let option of select.options) {
-                if (option.value === preselected || option.value.toLowerCase().includes(preselected.toLowerCase()) || preselected.toLowerCase().includes(option.value.toLowerCase())) {
-                    select.value = option.value;
-                    matched = true;
-                    break;
-                }
+    // 2. Attach dynamic onchange listener to update patient info card
+    const select = document.getElementById('consultPatient');
+    if (select) {
+        select.addEventListener('change', () => {
+            const chosenName = select.value;
+            if (!chosenName) {
+                displayPatientInfo(null);
+                return;
             }
-            if (!matched) {
-                const newOpt = new Option(preselected, preselected, true, true);
-                select.add(newOpt);
+            const found = registeredPatientsList.find(p => p.name === chosenName) || { name: chosenName };
+            displayPatientInfo(found);
+        });
+    }
+
+    // 3. Automatically input patient information if redirected from TCR / Schedule
+    await autoSelectPatientFromRequest();
+});
+
+/**
+ * Automatically selects and inputs patient information from sessionStorage or URL query params.
+ */
+async function autoSelectPatientFromRequest() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramName = urlParams.get('patient') || urlParams.get('name');
+    const preselectedRaw = sessionStorage.getItem('consult_patient');
+
+    let preselectedObj = null;
+    let targetName = paramName ? paramName.trim() : null;
+
+    if (preselectedRaw) {
+        try {
+            preselectedObj = JSON.parse(preselectedRaw);
+            if (preselectedObj && preselectedObj.name) {
+                targetName = preselectedObj.name.trim();
             }
-            showNotification(`Loaded consultation intake for ${preselected}`, 'success');
+        } catch (e) {
+            targetName = preselectedRaw.trim();
+            preselectedObj = { name: targetName };
         }
         sessionStorage.removeItem('consult_patient');
     }
-});
+
+    if (!targetName) return;
+
+    const select = document.getElementById('consultPatient');
+    if (!select) return;
+
+    // Find the patient in registeredPatientsList
+    let matchedPatient = registeredPatientsList.find(p => p.name && p.name.trim().toLowerCase() === targetName.toLowerCase());
+    if (!matchedPatient) {
+        matchedPatient = registeredPatientsList.find(p => p.name && (p.name.toLowerCase().includes(targetName.toLowerCase()) || targetName.toLowerCase().includes(p.name.toLowerCase())));
+    }
+    if (!matchedPatient && preselectedObj) {
+        matchedPatient = preselectedObj;
+    }
+
+    // Select in dropdown without ever matching the empty option
+    let optionMatched = false;
+    for (let i = 0; i < select.options.length; i++) {
+        const opt = select.options[i];
+        if (!opt.value) continue; // CRUCIAL: Never match empty option!
+        if (opt.value.trim().toLowerCase() === targetName.toLowerCase() ||
+            opt.value.toLowerCase().includes(targetName.toLowerCase()) ||
+            targetName.toLowerCase().includes(opt.value.toLowerCase())) {
+            select.selectedIndex = i;
+            select.value = opt.value;
+            optionMatched = true;
+            break;
+        }
+    }
+
+    if (!optionMatched) {
+        const conditionLabel = (matchedPatient && matchedPatient.condition) ? matchedPatient.condition : 'General Intake';
+        const newOpt = new Option(`${targetName} (${conditionLabel})`, targetName, true, true);
+        select.add(newOpt);
+        select.value = targetName;
+    }
+
+    // Display the patient's demographics, programs, allergies, etc.
+    displayPatientInfo(matchedPatient || { name: targetName });
+
+    showNotification(`Patient record automatically loaded for ${targetName}`, 'success');
+
+    // Automatically focus on systolic BP input for immediate vitals recording
+    const bpInput = document.getElementById('bpSys');
+    if (bpInput) {
+        setTimeout(() => bpInput.focus(), 250);
+    }
+}
+
+/**
+ * Displays full demographic, clinical, and contact information for the selected patient.
+ */
+function displayPatientInfo(patient) {
+    const card = document.getElementById('patientInfoCard');
+    const autoBadge = document.getElementById('autoLoadedIndicator');
+    if (!card) return;
+
+    if (!patient || !patient.name) {
+        card.classList.add('hidden');
+        if (autoBadge) autoBadge.classList.add('hidden');
+        return;
+    }
+
+    const nameEl = document.getElementById('dispPatientName');
+    const phEl = document.getElementById('dispPatientPhId');
+    const condEl = document.getElementById('dispPatientCondition');
+    const ageSexEl = document.getElementById('dispPatientAgeSex');
+    const purokEl = document.getElementById('dispPatientPurok');
+    const emergEl = document.getElementById('dispPatientEmergency');
+    const addrEl = document.getElementById('dispPatientAddress');
+    const progRow = document.getElementById('dispPatientProgramsRow');
+    const progEl = document.getElementById('dispPatientPrograms');
+    const algRow = document.getElementById('dispPatientAllergiesRow');
+    const algEl = document.getElementById('dispPatientAllergies');
+
+    if (nameEl) nameEl.textContent = patient.name;
+    if (phEl) phEl.textContent = patient.ph || patient.ph_id || 'N/A';
+    if (condEl) condEl.textContent = patient.condition || 'General Intake';
+
+    const age = (patient.age !== undefined && patient.age !== null && patient.age !== '') ? `${patient.age} yrs` : '--';
+    const sex = patient.sex || patient.gender || '--';
+    if (ageSexEl) ageSexEl.textContent = `${age} / ${sex}`;
+
+    if (purokEl) purokEl.textContent = patient.purok || 'Purok 1';
+
+    const emName = patient.emergency_contact_name || patient.emergencyContact || '';
+    const emRel = patient.emergency_contact_relationship || patient.emergencyRel || '';
+    const emNum = patient.emergency_contact_number || patient.emergencyPhone || '';
+    let emText = 'None listed';
+    if (emName) {
+        emText = emName + (emRel ? ` (${emRel})` : '') + (emNum ? ` - ${emNum}` : '');
+    }
+    if (emergEl) emergEl.textContent = emText;
+
+    let fullAddr = patient.address || '';
+    if (patient.purok && !fullAddr.includes(patient.purok)) {
+        fullAddr = fullAddr ? `${fullAddr}, ${patient.purok}` : patient.purok;
+    }
+    if (addrEl) addrEl.textContent = fullAddr || 'Barangay Proper';
+
+    // Programs
+    const progs = patient.government_programs || patient.programs || [];
+    if (progRow && progEl) {
+        if (Array.isArray(progs) && progs.length > 0) {
+            progEl.innerHTML = progs.map(pr => `<span class="badge badge-primary-subtle me-1" style="font-size: 0.7rem;">${escapeHtml(pr)}</span>`).join('');
+            progRow.classList.remove('hidden');
+        } else {
+            progRow.classList.add('hidden');
+        }
+    }
+
+    // Allergies & Risks
+    const alg = (patient.allergies && patient.allergies !== 'None reported' && patient.allergies !== 'None') ? patient.allergies : '';
+    const risks = patient.health_risks || patient.healthRisks || [];
+    if (algRow && algEl) {
+        let items = [];
+        if (alg) items.push(`Allergies: ${alg}`);
+        if (Array.isArray(risks) && risks.length > 0) items.push(`Risks: ${risks.join(', ')}`);
+        if (items.length > 0) {
+            algEl.textContent = items.join(' | ');
+            algRow.classList.remove('hidden');
+        } else {
+            algRow.classList.add('hidden');
+        }
+    }
+
+    card.classList.remove('hidden');
+    if (autoBadge) autoBadge.classList.remove('hidden');
+}
 
 // Populate registered patient dropdown dynamically from DB or local state
 async function populateRegisteredPatients() {
     const select = document.getElementById('consultPatient');
     if (!select) return;
 
-    let patients = [];
+    registeredPatientsList = [];
+    const authUser = sessionStorage.getItem('bwc_user') || 'charisma';
+    const authId = sessionStorage.getItem('bwc_user_id') || '26-001';
 
-    // Attempt backend fetch
+    // Attempt backend fetch with user auth headers
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
-        const res = await fetch(BACKEND_PATIENTS_URL, { signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), 1500);
+        const res = await fetch(`${BACKEND_PATIENTS_URL}?username=${authUser}&user_id=${authId}`, {
+            headers: { 'X-Username': authUser, 'X-User-Id': authId },
+            credentials: 'include',
+            signal: controller.signal
+        });
         clearTimeout(timeoutId);
         if (res.ok) {
             const data = await res.json();
             if (data.success && Array.isArray(data.data)) {
-                patients = data.data;
+                registeredPatientsList = data.data;
             }
         }
     } catch (e) {
         // Fallback to local storage
     }
 
-    if (patients.length === 0) {
+    if (registeredPatientsList.length === 0) {
         try {
             const raw = localStorage.getItem('bwc_patients_db');
-            if (raw) patients = JSON.parse(raw);
+            if (raw) registeredPatientsList = JSON.parse(raw);
         } catch (e) {
-            patients = [];
+            registeredPatientsList = [];
         }
     }
 
     // Clear previous options except default
     select.innerHTML = '<option value="">Choose registered patient...</option>';
 
-    if (patients.length === 0) {
+    if (registeredPatientsList.length === 0) {
         const opt = document.createElement('option');
         opt.value = '';
         opt.disabled = true;
@@ -85,7 +252,7 @@ async function populateRegisteredPatients() {
         return;
     }
 
-    patients.forEach(p => {
+    registeredPatientsList.forEach(p => {
         const opt = document.createElement('option');
         opt.value = p.name;
         opt.textContent = `${p.name} (${p.condition || 'General Intake'})`;
@@ -268,5 +435,6 @@ async function submitConsultation(e) {
     // Reset Form
     document.getElementById('consultForm').reset();
     document.getElementById('bmiResult').value = 'Enter weight and height...';
+    displayPatientInfo(null);
     calculateRisk();
 }

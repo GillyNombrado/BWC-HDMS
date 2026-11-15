@@ -12,9 +12,12 @@ Authentication with password hashing and audit logging.
 """
 
 import os
+import json
+import re
+import random
 import sqlite3
 from datetime import datetime, date, timedelta
-from flask import Flask, request, jsonify, send_from_directory, g
+from flask import Flask, request, jsonify, send_from_directory, g, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_migrate import Migrate
 
@@ -39,6 +42,27 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # Initialize Flask-SQLAlchemy and Flask-Migrate
 db.init_app(app)
 migrate = Migrate(app, db)
+
+
+# --------------------------------------------------------------------------
+# Cross-Origin Resource Sharing (CORS) & Browser Compatibility
+# --------------------------------------------------------------------------
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        res = app.make_default_options_response()
+        res.headers["Access-Control-Allow-Origin"] = "*"
+        res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Username, X-User-Id, X-Purok"
+        return res
+
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Username, X-User-Id, X-Purok"
+    return response
 
 
 # --------------------------------------------------------------------------
@@ -101,6 +125,7 @@ def init_db():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS patients (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                handler_id TEXT,
                 name TEXT NOT NULL,
                 first_name TEXT,
                 middle_name TEXT,
@@ -109,6 +134,7 @@ def init_db():
                 age INTEGER,
                 sex TEXT,
                 contact TEXT,
+                contact_number TEXT,
                 purok TEXT,
                 address TEXT,
                 condition TEXT,
@@ -116,9 +142,61 @@ def init_db():
                 ph_id TEXT,
                 last_visit TEXT,
                 risk_level TEXT DEFAULT 'Moderate',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                emergency_contact_name TEXT,
+                emergency_contact_relationship TEXT,
+                emergency_contact_number TEXT,
+                government_programs TEXT,
+                allergies TEXT,
+                health_risks TEXT,
+                medical_history TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (handler_id) REFERENCES users(id) ON DELETE SET NULL
             )
         """)
+
+        # Upgrade/migrate patients table schema if missing new form fields
+        try:
+            cursor.execute("PRAGMA table_info(patients)")
+            existing_cols = {col[1] for col in cursor.fetchall()}
+            
+            columns_to_add = [
+                ("handler_id", "TEXT"),
+                ("first_name", "TEXT"),
+                ("middle_name", "TEXT"),
+                ("last_name", "TEXT"),
+                ("dob", "TEXT"),
+                ("age", "INTEGER"),
+                ("sex", "TEXT"),
+                ("contact", "TEXT"),
+                ("contact_number", "TEXT"),
+                ("purok", "TEXT"),
+                ("address", "TEXT"),
+                ("condition", "TEXT"),
+                ("diagnosis_date", "TEXT"),
+                ("ph_id", "TEXT"),
+                ("last_visit", "TEXT"),
+                ("risk_level", "TEXT DEFAULT 'Moderate'"),
+                ("emergency_contact_name", "TEXT"),
+                ("emergency_contact_relationship", "TEXT"),
+                ("emergency_contact_number", "TEXT"),
+                ("government_programs", "TEXT"),
+                ("allergies", "TEXT"),
+                ("health_risks", "TEXT"),
+                ("medical_history", "TEXT")
+            ]
+            for col_name, col_def in columns_to_add:
+                if col_name not in existing_cols:
+                    cursor.execute(f"ALTER TABLE patients ADD COLUMN {col_name} {col_def}")
+
+            # If handler_id is null, link from assigned_bhw or purok
+            if "assigned_bhw" in existing_cols and "handler_id" in existing_cols:
+                cursor.execute("""
+                    UPDATE patients 
+                    SET handler_id = (SELECT id FROM users WHERE LOWER(users.username) = LOWER(patients.assigned_bhw) LIMIT 1)
+                    WHERE (handler_id IS NULL OR handler_id = '') AND assigned_bhw IS NOT NULL
+                """)
+        except Exception as mig_err:
+            print(f"[Patient Schema Migration Notice] {mig_err}")
 
         # 2. Consultations & Vitals Ledger Table
         cursor.execute("""
@@ -459,6 +537,15 @@ def login_user():
     raw_purok = user.get("purok") or station or user.get("station") or "Purok 1"
     clean_purok = raw_purok.split(",")[0].strip() if "," in raw_purok else raw_purok.strip()
 
+    # Store user session for user-specific data restriction
+    session["user_id"] = user["id"]
+    session["username"] = user["username"]
+    session["role"] = user["role"]
+    session["full_name"] = user.get("full_name") or user["username"]
+    session["station"] = clean_purok
+    session["purok"] = clean_purok
+    session.permanent = True
+
     return jsonify({
         "success": True,
         "message": "Authentication successful",
@@ -784,41 +871,195 @@ def submit_consultation():
 # --------------------------------------------------------------------------
 @app.route("/api/patients", methods=["GET"])
 def get_patients():
-    """Retrieves all registered TCR patients from SQLite."""
-    patients = query_db("SELECT * FROM patients ORDER BY id DESC")
-    return jsonify({"success": True, "count": len(patients), "data": patients})
+    """
+    Retrieves TCR patients assigned to or managed by the logged-in user session.
+    Checks session['user_id'] or session['username'] (with fallback to request headers, query parameters, or default station BHW).
+    """
+    user_id = session.get("user_id") or request.args.get("user_id") or request.headers.get("X-User-Id")
+    username = session.get("username") or request.args.get("username") or request.headers.get("X-Username")
+
+    logged_user = None
+    if user_id:
+        logged_user = query_db("""
+            SELECT * FROM users 
+            WHERE id = ? OR LOWER(username) = LOWER(?)
+        """, (str(user_id), str(user_id)), one=True)
+    elif username:
+        logged_user = query_db("""
+            SELECT * FROM users 
+            WHERE LOWER(username) = LOWER(?) OR id = ?
+        """, (str(username), str(username)), one=True)
+
+    # Fallback to default terminal BHW (Charisma Astronomo, Purok 1) if no session or params passed
+    if not logged_user:
+        logged_user = query_db("""
+            SELECT * FROM users 
+            WHERE LOWER(username) = 'charisma' OR id = '26-001'
+            LIMIT 1
+        """, one=True)
+
+    if logged_user:
+        u_username = logged_user["username"].lower()
+        u_id = str(logged_user["id"])
+        u_purok = (logged_user.get("purok") or logged_user.get("station") or "").strip()
+        u_role = (logged_user.get("role") or "").lower()
+
+        # Admin users can view all records if requested with ?all=true
+        if u_role == "admin" and request.args.get("all") == "true":
+            patients = query_db("SELECT * FROM patients ORDER BY id DESC")
+        else:
+            patients = query_db("""
+                SELECT * FROM patients 
+                WHERE handler_id = ? 
+                   OR handler_id = ?
+                   OR (purok IS NOT NULL AND LOWER(purok) = LOWER(?))
+                ORDER BY id DESC
+            """, (u_id, u_username, u_purok))
+    else:
+        patients = []
+
+    # Format patients to ensure compatibility across client templates
+    formatted_patients = []
+    for p in patients:
+        p_dict = dict(p)
+        # Parse JSON array fields
+        gov_progs = []
+        if p_dict.get("government_programs"):
+            try:
+                raw_gp = str(p_dict["government_programs"]).strip()
+                gov_progs = json.loads(raw_gp) if raw_gp.startswith("[") else [raw_gp]
+            except Exception:
+                gov_progs = [p_dict["government_programs"]]
+
+        h_risks = []
+        if p_dict.get("health_risks"):
+            try:
+                raw_hr = str(p_dict["health_risks"]).strip()
+                h_risks = json.loads(raw_hr) if raw_hr.startswith("[") else [raw_hr]
+            except Exception:
+                h_risks = [p_dict["health_risks"]]
+
+        clean_sex = p_dict.get("sex") or p_dict.get("gender") or "Female"
+        clean_ph = str(p_dict.get("ph_id") or p_dict.get("ph") or "").strip()
+        if not clean_ph:
+            clean_ph = "Pending RHU Assignment"
+
+        p_dict["sex"] = clean_sex
+        p_dict["gender"] = clean_sex
+        p_dict["ph_id"] = clean_ph
+        p_dict["ph"] = clean_ph
+        p_dict["programs"] = gov_progs
+        p_dict["government_programs"] = gov_progs
+        p_dict["healthRisks"] = h_risks
+        p_dict["health_risks"] = h_risks
+        p_dict["firstName"] = p_dict.get("first_name") or ""
+        p_dict["middleName"] = p_dict.get("middle_name") or ""
+        p_dict["lastName"] = p_dict.get("last_name") or ""
+        p_dict["contact"] = p_dict.get("contact") or p_dict.get("contact_number") or ""
+        p_dict["contact_number"] = p_dict["contact"]
+        p_dict["diagnosisDate"] = p_dict.get("diagnosis_date") or ""
+        p_dict["diagnosis_date"] = p_dict["diagnosisDate"]
+        p_dict["risk"] = p_dict.get("risk_level") or "Moderate"
+        p_dict["risk_level"] = p_dict["risk"]
+        p_dict["lastVisit"] = p_dict.get("last_visit") or "Today"
+        p_dict["last_visit"] = p_dict["lastVisit"]
+        p_dict["emergencyName"] = p_dict.get("emergency_contact_name") or ""
+        p_dict["emergency_contact_name"] = p_dict["emergencyName"]
+        p_dict["emergencyRel"] = p_dict.get("emergency_contact_relationship") or ""
+        p_dict["emergency_contact_relationship"] = p_dict["emergencyRel"]
+        p_dict["emergencyPhone"] = p_dict.get("emergency_contact_number") or ""
+        p_dict["emergency_contact_number"] = p_dict["emergencyPhone"]
+        p_dict["medHistory"] = p_dict.get("medical_history") or ""
+        p_dict["medical_history"] = p_dict["medHistory"]
+        p_dict["allergies"] = p_dict.get("allergies") or "None reported"
+
+        formatted_patients.append(p_dict)
+
+    return jsonify({"success": True, "count": len(formatted_patients), "data": formatted_patients})
 
 
 @app.route("/api/patients", methods=["POST"])
 def register_patient():
-    """Registers a new patient into the TCR table."""
+    """Registers a new patient into the TCR table assigned to current user."""
     data = request.get_json() or {}
-    name = data.get("name", "").strip()
+    first_name = (data.get("firstName") or data.get("first_name") or "").strip()
+    middle_name = (data.get("middleName") or data.get("middle_name") or "").strip() or None
+    last_name = (data.get("lastName") or data.get("last_name") or "").strip()
+    name = (data.get("name") or "").strip()
+    if not name and (first_name or last_name):
+        name = f"{first_name} {middle_name} {last_name}".replace("  ", " ").strip() if middle_name else f"{first_name} {last_name}".strip()
+
     if not name:
         return jsonify({"success": False, "error": "Patient name is required"}), 400
 
+    # Handler reference resolution: handler_id foreign key linking to users.id (YY-NNN format)
+    handler_id = data.get("handler_id") or session.get("user_id") or request.headers.get("X-User-Id")
+    if not handler_id:
+        user_identifier = session.get("username") or request.headers.get("X-Username") or request.args.get("username") or "charisma"
+        user_row = query_db("SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR id = ?", (user_identifier, user_identifier), one=True)
+        handler_id = user_row["id"] if user_row else "26-001"
+
+    # PhilHealth ID validation: strictly 12 unique numbers without formatting or hyphens
+    raw_ph = str(data.get("ph") or data.get("ph_id") or "").strip()
+    digits_ph = re.sub(r"\D", "", raw_ph)
+    if len(digits_ph) == 12:
+        clean_ph = digits_ph
+    elif digits_ph:
+        clean_ph = digits_ph[:12].zfill(12)
+    else:
+        clean_ph = f"{random.randint(100000, 999999)}{random.randint(100000, 999999)}"
+
+    # Address cleanup: house/block/sitio address only (purok stored in dedicated column)
+    purok = (data.get("purok") or "Purok 1").strip()
+    address = (data.get("address") or "").strip()
+    if address.lower().startswith(purok.lower()):
+        address = address[len(purok):].lstrip(", ").strip()
+    if not address:
+        address = "Sitio Sentro"
+
+    # Parse and serialize multi-value arrays to JSON strings
+    programs_input = data.get("programs") or data.get("government_programs") or []
+    if isinstance(programs_input, list):
+        gov_programs_json = json.dumps(programs_input)
+    else:
+        gov_programs_json = json.dumps([programs_input]) if programs_input else "[]"
+
+    risks_input = data.get("healthRisks") or data.get("health_risks") or []
+    if isinstance(risks_input, list):
+        health_risks_json = json.dumps(risks_input)
+    else:
+        health_risks_json = json.dumps([risks_input]) if risks_input else "[]"
+
+    sex = (data.get("sex") or "Female").strip()
+    age = int(data.get("age", 0)) if str(data.get("age", "")).isdigit() else 0
+    dob = (data.get("dob") or "").strip()
+    contact = (data.get("contact") or data.get("contact_number") or "").strip()
+    condition = (data.get("condition") or "Hypertension Only").strip()
+    diagnosis_date = (data.get("diagnosisDate") or data.get("diagnosis_date") or date.today().isoformat()).strip()
+    last_visit = (data.get("lastVisit") or data.get("last_visit") or "Today").strip()
+    risk_level = (data.get("risk") or data.get("risk_level") or "Moderate").strip()
+    emergency_name = (data.get("emergencyName") or data.get("emergency_contact_name") or "").strip()
+    emergency_rel = (data.get("emergencyRel") or data.get("emergency_contact_relationship") or "").strip()
+    emergency_phone = (data.get("emergencyPhone") or data.get("emergency_contact_number") or "").strip()
+    allergies = (data.get("allergies") or "None reported").strip()
+    med_history = (data.get("medHistory") or data.get("medical_history") or "").strip()
+
     patient_id = execute_db("""
-        INSERT INTO patients (name, first_name, middle_name, last_name, dob, age, sex, contact, purok, address, condition, diagnosis_date, ph_id, last_visit, risk_level)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO patients (
+            handler_id, name, first_name, middle_name, last_name, dob, age, sex,
+            contact, contact_number, purok, address, condition, diagnosis_date, ph_id,
+            last_visit, risk_level, emergency_contact_name, emergency_contact_relationship,
+            emergency_contact_number, government_programs, allergies, health_risks, medical_history
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        name,
-        data.get("firstName", ""),
-        data.get("middleName", ""),
-        data.get("lastName", ""),
-        data.get("dob", ""),
-        data.get("age", 0),
-        data.get("sex", "Male"),
-        data.get("contact", ""),
-        data.get("purok", "Purok 1"),
-        data.get("address", ""),
-        data.get("condition", "Hypertension Only"),
-        data.get("diagnosisDate", date.today().isoformat()),
-        data.get("ph", ""),
-        data.get("lastVisit", "Today"),
-        data.get("risk", "Moderate")
+        handler_id, name, first_name, middle_name, last_name, dob, age, sex,
+        contact, contact, purok, address, condition, diagnosis_date, clean_ph,
+        last_visit, risk_level, emergency_name, emergency_rel, emergency_phone,
+        gov_programs_json, allergies, health_risks_json, med_history
     ))
 
-    log_audit_event(None, "PATIENT_REGISTERED", f"Registered new client '{name}' in TCR.")
+    log_audit_event(handler_id, "PATIENT_REGISTERED", f"Registered new client '{name}' in TCR (Handler ID: {handler_id}).")
 
     new_patient = query_db("SELECT * FROM patients WHERE id = ?", (patient_id,), one=True)
     return jsonify({"success": True, "message": "Patient registered successfully", "data": new_patient}), 201

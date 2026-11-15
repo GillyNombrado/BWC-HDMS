@@ -21,6 +21,7 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Strict Foreign Key Relationships
+    patients = db.relationship('Patient', back_populates='handler', lazy=True)
     appointments = db.relationship('Appointment', back_populates='user', lazy=True)
     audit_logs = db.relationship('AuditLog', back_populates='user', lazy=True)
 
@@ -79,6 +80,7 @@ class Patient(db.Model):
     __tablename__ = 'patients'
 
     id = db.Column(db.Integer, primary_key=True)
+    handler_id = db.Column(db.String(20), db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     name = db.Column(db.String(150), nullable=True)
     first_name = db.Column(db.String(80), nullable=False)
     middle_name = db.Column(db.String(80), nullable=True)
@@ -86,41 +88,86 @@ class Patient(db.Model):
     dob = db.Column(db.String(20), nullable=True)
     age = db.Column(db.Integer, nullable=True)
     sex = db.Column(db.String(20), nullable=True)
-    gender = db.Column(db.String(20), nullable=True)
     contact_number = db.Column(db.String(50), nullable=True)
     address = db.Column(db.String(255), nullable=True)
     purok = db.Column(db.String(100), nullable=True)
-    assigned_bhw = db.Column(db.String(80), nullable=True)
-    medical_status = db.Column(db.String(100), default="Monitoring / Maintenance")
     condition = db.Column(db.String(100), nullable=True)
     diagnosis_date = db.Column(db.String(50), nullable=True)
     ph_id = db.Column(db.String(50), nullable=True)
     last_visit = db.Column(db.String(50), nullable=True)
     risk_level = db.Column(db.String(50), default="Moderate")
+    emergency_contact_name = db.Column(db.String(150), nullable=True)
+    emergency_contact_relationship = db.Column(db.String(80), nullable=True)
+    emergency_contact_number = db.Column(db.String(50), nullable=True)
+    government_programs = db.Column(db.Text, nullable=True)
+    allergies = db.Column(db.Text, nullable=True)
+    health_risks = db.Column(db.Text, nullable=True)
+    medical_history = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Cascade Relationships
+    # Cascade & Foreign Key Relationships
+    handler = db.relationship('User', back_populates='patients')
     vitals = db.relationship('Vital', back_populates='patient', lazy=True, cascade='all, delete-orphan')
     dispensations = db.relationship('Dispensation', back_populates='patient', lazy=True, cascade='all, delete-orphan')
     appointments = db.relationship('Appointment', back_populates='patient', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
+        import json
+        programs = []
+        if self.government_programs:
+            try:
+                programs = json.loads(self.government_programs) if self.government_programs.startswith('[') else [self.government_programs]
+            except Exception:
+                programs = [self.government_programs]
+
+        risks = []
+        if self.health_risks:
+            try:
+                risks = json.loads(self.health_risks) if self.health_risks.startswith('[') else [self.health_risks]
+            except Exception:
+                risks = [self.health_risks]
+
         return {
             'id': self.id,
+            'handler_id': self.handler_id,
+            'assigned_bhw': self.handler.username if self.handler else None,
             'name': self.name or f"{self.first_name} {self.last_name}".strip(),
             'first_name': self.first_name,
-            'last_name': self.last_name,
+            'firstName': self.first_name,
             'middle_name': self.middle_name,
+            'middleName': self.middle_name,
+            'last_name': self.last_name,
+            'lastName': self.last_name,
+            'dob': self.dob,
             'age': self.age,
-            'sex': self.sex or self.gender,
+            'sex': self.sex,
+            'gender': self.sex,
             'contact': self.contact_number,
+            'contact_number': self.contact_number,
             'purok': self.purok,
             'address': self.address,
-            'condition': self.condition or self.medical_status,
+            'condition': self.condition,
             'diagnosis_date': self.diagnosis_date,
+            'diagnosisDate': self.diagnosis_date,
             'ph_id': self.ph_id,
+            'ph': self.ph_id,
             'last_visit': self.last_visit,
+            'lastVisit': self.last_visit,
             'risk_level': self.risk_level,
+            'risk': self.risk_level,
+            'emergency_contact_name': self.emergency_contact_name,
+            'emergencyName': self.emergency_contact_name,
+            'emergency_contact_relationship': self.emergency_contact_relationship,
+            'emergencyRel': self.emergency_contact_relationship,
+            'emergency_contact_number': self.emergency_contact_number,
+            'emergencyPhone': self.emergency_contact_number,
+            'government_programs': programs,
+            'programs': programs,
+            'allergies': self.allergies or "None reported",
+            'health_risks': risks,
+            'healthRisks': risks,
+            'medical_history': self.medical_history,
+            'medHistory': self.medical_history,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 

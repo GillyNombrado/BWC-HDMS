@@ -476,7 +476,7 @@ async function confirmReschedule(e) {
  */
 function proceedToConsultation(patientName) {
     sessionStorage.setItem('consult_patient', patientName);
-    window.location.href = 'vitalsPage.html';
+    window.location.href = `vitalsPage.html?patient=${encodeURIComponent(patientName)}`;
 }
 
 // --------------------------------------------------------------------------
