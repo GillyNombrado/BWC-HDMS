@@ -214,7 +214,7 @@ async function submitConsultation(e) {
         patientName: patient,
         category: category,
         scheduledDate: nextDateStr,
-        purok: "Poblacion 1",
+        purok: "Purok 1",
         remarks: `Auto-scheduled 30-day routine follow-up. Prior reading: BP ${sys}/${dia} mmHg${glu > 0 ? `, Glucose: ${glu} mg/dL` : ''}.`,
         status: "Pending",
         completedDate: null

@@ -2,11 +2,12 @@
 ==============================================================================
 Barangay Wellness Circle: Hypertension & Diabetes Management System (BWC-HDMS)
 Capstone Project - CMSC 309
-Backend Server: Python / Flask with Embedded SQLite Database
+Backend Server: Python / Flask with Embedded SQLite Database & Flask-Migrate
 ==============================================================================
 This module provides the local offline RESTful API and static web server for
 the BWC-HDMS portal. It handles data persistence for Target Client Registry
-(TCR), Consultations, Medicine Inventory, and the Monthly Schedule System.
+(TCR), Consultations, Medicine Inventory, Monthly Schedule System, and User
+Authentication with password hashing and audit logging.
 ==============================================================================
 """
 
@@ -14,17 +15,34 @@ import os
 import sqlite3
 from datetime import datetime, date, timedelta
 from flask import Flask, request, jsonify, send_from_directory, g
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_migrate import Migrate
 
-# Initialize Flask application
+# Import SQLAlchemy database and models
+from models import (
+    db, User, Patient, Inventory, InventoryItem,
+    Appointment, AuditLog, ActivityLog, Vital, Dispensation
+)
+
+# --------------------------------------------------------------------------
+# Flask Application Setup & Configuration
+# --------------------------------------------------------------------------
 app = Flask(__name__, static_folder=".", static_url_path="")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "bwc-hdms-offline-secret-key-2026")
 
-# SQLite Database configuration
+# Embedded SQLite Database Configuration
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(BASE_DIR, "bwc_hdms.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DATABASE}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Initialize Flask-SQLAlchemy and Flask-Migrate
+db.init_app(app)
+migrate = Migrate(app, db)
 
 
 # --------------------------------------------------------------------------
-# Database Connection Helpers
+# Database Connection Helpers (Direct SQLite Execution)
 # --------------------------------------------------------------------------
 def get_db():
     """Opens a new database connection if there is none for the current request."""
@@ -51,16 +69,27 @@ def query_db(query, args=(), one=False):
 
 def execute_db(query, args=()):
     """Helper to execute write operations and commit."""
-    db = get_db()
-    cur = db.execute(query, args)
-    db.commit()
+    db_conn = get_db()
+    cur = db_conn.execute(query, args)
+    db_conn.commit()
     last_id = cur.lastrowid
     cur.close()
     return last_id
 
 
+def log_audit_event(user_id, action, details=None):
+    """Helper to log critical operations into the audit_logs table."""
+    try:
+        execute_db("""
+            INSERT INTO audit_logs (user_id, action, details)
+            VALUES (?, ?, ?)
+        """, (user_id, action, details))
+    except Exception as err:
+        print(f"[Audit Log Error] {err}")
+
+
 # --------------------------------------------------------------------------
-# Database Initialization (Schema Only - Clean Zero State)
+# Database Initialization (Schema Creation - Clean Zero State)
 # --------------------------------------------------------------------------
 def init_db():
     """Initializes tables cleanly without injecting mock or seed data."""
@@ -108,10 +137,12 @@ def init_db():
         )
     """)
 
-    # 3. Monthly Appointments & Schedule Table
+    # 3. Monthly Appointments & Schedule Table (with strict Foreign Keys)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS appointments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER,
+            user_id INTEGER,
             patient_name TEXT NOT NULL,
             category TEXT NOT NULL,      -- 'Monthly HPN Check', 'Diabetes Follow-up', 'Medicine Refill', 'Purok Assembly'
             scheduled_date TEXT NOT NULL, -- ISO 'YYYY-MM-DD'
@@ -119,11 +150,13 @@ def init_db():
             remarks TEXT,
             status TEXT DEFAULT 'Pending', -- 'Pending', 'Completed', 'Defaulted'
             completed_date TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
         )
     """)
 
-    # 4. Medicine Inventory Table
+    # 4. Medicine Inventory Table (with Expiration Date for shelf-life tracking)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,7 +168,33 @@ def init_db():
             unit TEXT DEFAULT 'tabs',
             reorder_level INTEGER DEFAULT 20,
             status TEXT DEFAULT 'Adequate',
+            expiration_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 5. User Authentication Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'bhw',     -- 'bhw', 'midwife', 'admin'
+            full_name TEXT,
+            station TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 6. Audit Logs Table (System & Clinical Integrity Tracking)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action TEXT NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            details TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
         )
     """)
 
@@ -157,6 +216,120 @@ def index():
 def serve_static(filename):
     """Serves static files (HTML, CSS, JS, images, icons)."""
     return send_from_directory(".", filename)
+
+
+# --------------------------------------------------------------------------
+# RESTful API Endpoints - Authentication & Security (Password Hashing)
+# --------------------------------------------------------------------------
+@app.route("/api/auth/register", methods=["POST"])
+@app.route("/api/register", methods=["POST"])
+def register_user():
+    """
+    Registers a new health station worker with salted password hashing.
+    Payload: { username, password, role, full_name, station }
+    """
+    data = request.get_json() or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    role = data.get("role", "bhw").strip()
+    full_name = data.get("full_name", "").strip()
+    station = data.get("station", "BHS Poblacion 2").strip()
+
+    if not username or not password:
+        return jsonify({"success": False, "error": "Username and password are required"}), 400
+
+    # Ensure unique username
+    existing = query_db("SELECT id FROM users WHERE username = ?", (username,), one=True)
+    if existing:
+        return jsonify({"success": False, "error": f"Username '{username}' is already registered."}), 409
+
+    # Hash the password securely using PBKDF2:SHA256
+    password_hash = generate_password_hash(password, method="pbkdf2:sha256")
+
+    user_id = execute_db("""
+        INSERT INTO users (username, password_hash, role, full_name, station)
+        VALUES (?, ?, ?, ?, ?)
+    """, (username, password_hash, role, full_name or username, station))
+
+    log_audit_event(user_id, "USER_REGISTERED", f"Created user '{username}' with role '{role}'.")
+
+    return jsonify({
+        "success": True,
+        "message": "User registered successfully",
+        "user": {
+            "id": user_id,
+            "username": username,
+            "role": role,
+            "full_name": full_name or username,
+            "station": station
+        }
+    }), 201
+
+
+@app.route("/api/auth/login", methods=["POST"])
+@app.route("/api/login", methods=["POST"])
+def login_user():
+    """
+    Authenticates station worker credentials using secure password hash comparison.
+    Payload: { username, password, station }
+    """
+    data = request.get_json() or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    station = data.get("station", "").strip()
+
+    if not username or not password:
+        return jsonify({"success": False, "error": "Username and password are required"}), 400
+
+    user = query_db("SELECT * FROM users WHERE username = ?", (username,), one=True)
+    if not user or not check_password_hash(user["password_hash"], password):
+        log_audit_event(
+            user["id"] if user else None,
+            "LOGIN_FAILED",
+            f"Failed sign-in attempt for username '{username}'."
+        )
+        return jsonify({"success": False, "error": "Invalid username or station security password."}), 401
+
+    log_audit_event(
+        user["id"],
+        "LOGIN_SUCCESS",
+        f"User '{username}' logged in successfully at station '{station or user['station']}'."
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Authentication successful",
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "role": user["role"],
+            "full_name": user.get("full_name") or user["username"],
+            "station": station or user.get("station") or "BHS Poblacion 2"
+        }
+    })
+
+
+@app.route("/api/auth/users", methods=["GET"])
+def get_users():
+    """Retrieves registered terminal users (hashes strictly excluded)."""
+    users = query_db("SELECT id, username, role, full_name, station, created_at FROM users ORDER BY id ASC")
+    return jsonify({"success": True, "count": len(users), "data": users})
+
+
+# --------------------------------------------------------------------------
+# RESTful API Endpoints - Audit Trail & Security Logs
+# --------------------------------------------------------------------------
+@app.route("/api/audit-logs", methods=["GET"])
+def get_audit_logs():
+    """Retrieves system and clinical audit log trail."""
+    logs = query_db("""
+        SELECT a.id, a.user_id, u.username, a.action, a.details, a.timestamp
+        FROM audit_logs a
+        LEFT JOIN users u ON a.user_id = u.id
+        ORDER BY a.id DESC
+        LIMIT 100
+    """)
+    return jsonify({"success": True, "count": len(logs), "data": logs})
 
 
 # --------------------------------------------------------------------------
@@ -208,27 +381,29 @@ def get_appointments():
         params.append(status_filter)
 
     if search_query:
-        query += " AND (patient_name LIKE ? OR remarks LIKE ? OR purok LIKE ?)"
-        like_arg = f"%{search_query}%"
-        params.extend([like_arg, like_arg, like_arg])
+        query += " AND (patient_name LIKE ? OR remarks LIKE ?)"
+        term = f"%{search_query.strip()}%"
+        params.extend([term, term])
 
-    query += " ORDER BY scheduled_date ASC, id DESC"
+    query += " ORDER BY scheduled_date ASC, id ASC"
+
     appointments = query_db(query, params)
-
     return jsonify({"success": True, "count": len(appointments), "data": appointments})
 
 
 @app.route("/api/appointments", methods=["POST"])
 def create_appointment():
     """
-    Registers a new scheduled event or patient follow-up appointment.
-    Payload: { patient_name, category, scheduled_date, purok, remarks }
+    Registers a new scheduled appointment or community check-up event.
+    Payload: { patient_id, user_id, patient_name, category, scheduled_date, purok, remarks }
     """
     data = request.get_json() or {}
+    patient_id = data.get("patient_id")
+    user_id = data.get("user_id")
     patient_name = data.get("patient_name", "").strip()
     category = data.get("category", "Monthly HPN Check").strip()
     scheduled_date = data.get("scheduled_date", date.today().isoformat()).strip()
-    purok = data.get("purok", "Poblacion 1").strip()
+    purok = data.get("purok", "Purok 1").strip()
     remarks = data.get("remarks", "").strip()
     status = data.get("status", "Pending")
 
@@ -241,21 +416,25 @@ def create_appointment():
         status = "Defaulted"
 
     appt_id = execute_db("""
-        INSERT INTO appointments (patient_name, category, scheduled_date, purok, remarks, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (patient_name, category, scheduled_date, purok, remarks, status))
+        INSERT INTO appointments (patient_id, user_id, patient_name, category, scheduled_date, purok, remarks, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (patient_id, user_id, patient_name, category, scheduled_date, purok, remarks, status))
 
-    new_record = query_db("SELECT * FROM appointments WHERE id = ?", (appt_id,), one=True)
-    return jsonify({"success": True, "message": "Appointment scheduled successfully", "data": new_record}), 201
+    log_audit_event(user_id, "APPOINTMENT_SCHEDULED", f"Scheduled '{category}' for {patient_name} on {scheduled_date}.")
+
+    new_appt = query_db("SELECT * FROM appointments WHERE id = ?", (appt_id,), one=True)
+    return jsonify({"success": True, "message": "Appointment created successfully", "data": new_appt}), 201
 
 
 @app.route("/api/appointments/<int:appt_id>/status", methods=["PUT"])
 def update_appointment_status(appt_id):
     """
-    Updates the status of an appointment (e.g., mark as Completed, Pending, or Defaulted).
+    Updates the status of an appointment (e.g. 'Completed', 'Pending', 'Defaulted').
+    Payload: { status: 'Completed' | 'Pending' | 'Defaulted' }
     """
     data = request.get_json() or {}
     new_status = data.get("status")
+
     if new_status not in ["Pending", "Completed", "Defaulted"]:
         return jsonify({"success": False, "error": "Invalid status value"}), 400
 
@@ -267,110 +446,102 @@ def update_appointment_status(appt_id):
         WHERE id = ?
     """, (new_status, completed_date, appt_id))
 
-    updated = query_db("SELECT * FROM appointments WHERE id = ?", (appt_id,), one=True)
-    return jsonify({"success": True, "message": f"Status updated to {new_status}", "data": updated})
+    updated_appt = query_db("SELECT * FROM appointments WHERE id = ?", (appt_id,), one=True)
+    if not updated_appt:
+        return jsonify({"success": False, "error": "Appointment not found"}), 404
+
+    log_audit_event(None, "APPOINTMENT_STATUS_UPDATE", f"Appointment #{appt_id} updated to {new_status}.")
+
+    return jsonify({"success": True, "message": f"Status updated to {new_status}", "data": updated_appt})
 
 
 @app.route("/api/appointments/<int:appt_id>/reschedule", methods=["PUT"])
 def reschedule_appointment(appt_id):
     """
-    Reschedules an appointment to a new date, resets completed state,
-    and appends reschedule audit remarks.
+    Reschedules an appointment to a new date and updates remarks.
+    Payload: { new_date: 'YYYY-MM-DD', reason: '...' }
     """
     data = request.get_json() or {}
-    new_date = data.get("scheduled_date")
+    new_date = data.get("new_date", "").strip()
     reason = data.get("reason", "").strip()
 
     if not new_date:
-        return jsonify({"success": False, "error": "New scheduled date is required"}), 400
-
-    today_str = date.today().isoformat()
-    new_status = "Defaulted" if new_date < today_str else "Pending"
+        return jsonify({"success": False, "error": "New date is required"}), 400
 
     appt = query_db("SELECT * FROM appointments WHERE id = ?", (appt_id,), one=True)
     if not appt:
         return jsonify({"success": False, "error": "Appointment not found"}), 404
 
-    current_remarks = appt.get("remarks") or ""
-    append_note = f"Rescheduled to {new_date}" + (f": {reason}" if reason else "")
-    updated_remarks = f"{current_remarks} | {append_note}" if current_remarks else append_note
+    today_str = date.today().isoformat()
+    new_status = "Pending" if new_date >= today_str else "Defaulted"
+
+    existing_remarks = appt.get("remarks") or ""
+    reschedule_note = f"[Rescheduled from {appt['scheduled_date']} to {new_date}{': ' + reason if reason else ''}]"
+    updated_remarks = f"{existing_remarks} {reschedule_note}".strip()
 
     execute_db("""
         UPDATE appointments
-        SET scheduled_date = ?, status = ?, completed_date = NULL, remarks = ?
+        SET scheduled_date = ?, remarks = ?, status = ?, completed_date = NULL
         WHERE id = ?
-    """, (new_date, new_status, updated_remarks, appt_id))
+    """, (new_date, updated_remarks, new_status, appt_id))
 
-    updated = query_db("SELECT * FROM appointments WHERE id = ?", (appt_id,), one=True)
-    return jsonify({"success": True, "message": "Appointment rescheduled successfully", "data": updated})
+    updated_appt = query_db("SELECT * FROM appointments WHERE id = ?", (appt_id,), one=True)
+    log_audit_event(None, "APPOINTMENT_RESCHEDULED", f"Appointment #{appt_id} rescheduled to {new_date}.")
+
+    return jsonify({"success": True, "message": "Appointment rescheduled successfully", "data": updated_appt})
 
 
-# --------------------------------------------------------------------------
-# RESTful API Endpoints - Dashboard Integration & Stats
-# --------------------------------------------------------------------------
 @app.route("/api/appointments/stats", methods=["GET"])
-def get_dashboard_stats():
+def get_appointment_stats():
     """
-    Calculates summary metrics dynamically for the Dashboard:
-      - Active TCR Patients count
-      - Due Today Follow-ups count
-      - Overdue / Defaulted count
-      - Low-Stock Medicines count
+    Provides aggregated counts for the dashboard cards:
+    - Due Today
+    - Overdue / Defaulted
+    - Pending This Month
+    - Completed This Month
     """
     today_str = date.today().isoformat()
+    current_month = f"{date.today().month:02d}"
 
-    # Refresh Defaulted statuses first
-    execute_db("""
-        UPDATE appointments
-        SET status = 'Defaulted'
-        WHERE status = 'Pending' AND scheduled_date < ?
-    """, (today_str,))
-
-    # Active Patients
-    res_active = query_db("SELECT COUNT(*) AS count FROM patients", one=True)
-    active_count = res_active["count"] if res_active else 0
-
-    # Due Today (Pending on today's date)
-    res_due = query_db("""
-        SELECT COUNT(*) AS count FROM appointments
+    due_today = query_db("""
+        SELECT COUNT(*) as count FROM appointments
         WHERE scheduled_date = ? AND status = 'Pending'
-    """, (today_str,), one=True)
-    due_today_count = res_due["count"] if res_due else 0
+    """, (today_str,), one=True)["count"]
 
-    # Overdue / Defaulted
-    res_overdue = query_db("""
-        SELECT COUNT(*) AS count FROM appointments
-        WHERE status = 'Defaulted'
-    """, one=True)
-    overdue_count = res_overdue["count"] if res_overdue else 0
+    overdue = query_db("""
+        SELECT COUNT(*) as count FROM appointments
+        WHERE status = 'Defaulted' OR (status = 'Pending' AND scheduled_date < ?)
+    """, (today_str,), one=True)["count"]
 
-    # Low Stock Medicines (current_stock <= reorder_level)
-    res_stock = query_db("""
-        SELECT COUNT(*) AS count FROM inventory
-        WHERE current_stock <= reorder_level
-    """, one=True)
-    low_stock_count = res_stock["count"] if res_stock else 0
+    completed_month = query_db("""
+        SELECT COUNT(*) as count FROM appointments
+        WHERE status = 'Completed' AND strftime('%m', completed_date) = ?
+    """, (current_month,), one=True)["count"]
+
+    pending_month = query_db("""
+        SELECT COUNT(*) as count FROM appointments
+        WHERE status = 'Pending' AND strftime('%m', scheduled_date) = ?
+    """, (current_month,), one=True)["count"]
 
     return jsonify({
         "success": True,
         "data": {
-            "active_patients": active_count,
-            "due_today": due_today_count,
-            "overdue_defaulted": overdue_count,
-            "low_stock": low_stock_count,
-            "server_date": today_str
+            "due_today": due_today,
+            "overdue_defaulted": overdue,
+            "completed_this_month": completed_month,
+            "pending_this_month": pending_month
         }
     })
 
 
 # --------------------------------------------------------------------------
-# RESTful API Endpoints - Consultations & Auto 30-Day Follow-up
+# RESTful API Endpoints - Consultations & Clinical Follow-up Engine
 # --------------------------------------------------------------------------
 @app.route("/api/consultations", methods=["POST"])
-def record_consultation():
+def submit_consultation():
     """
-    Records a patient consultation and automatically schedules the next
-    routine 30-day follow-up appointment in the schedule data store.
+    Records a patient clinical consultation and automatically schedules
+    a 30-day routine follow-up appointment in the SQLite appointments ledger.
     """
     data = request.get_json() or {}
     patient_name = data.get("patient_name", "").strip()
@@ -415,7 +586,9 @@ def record_consultation():
     execute_db("""
         INSERT INTO appointments (patient_name, category, scheduled_date, purok, remarks, status)
         VALUES (?, ?, ?, ?, ?, 'Pending')
-    """, (patient_name, category, next_date, "Poblacion 1", appt_remarks))
+    """, (patient_name, category, next_date, "Purok 1", appt_remarks))
+
+    log_audit_event(None, "CONSULTATION_SUBMITTED", f"Recorded vitals for {patient_name} (BP: {sys_bp}/{dia_bp}).")
 
     return jsonify({
         "success": True,
@@ -455,7 +628,7 @@ def register_patient():
         data.get("age", 0),
         data.get("sex", "Male"),
         data.get("contact", ""),
-        data.get("purok", "Poblacion 1"),
+        data.get("purok", "Purok 1"),
         data.get("address", ""),
         data.get("condition", "Hypertension Only"),
         data.get("diagnosisDate", date.today().isoformat()),
@@ -463,12 +636,15 @@ def register_patient():
         data.get("lastVisit", "Today"),
         data.get("risk", "Moderate")
     ))
+
+    log_audit_event(None, "PATIENT_REGISTERED", f"Registered new client '{name}' in TCR.")
+
     new_patient = query_db("SELECT * FROM patients WHERE id = ?", (patient_id,), one=True)
     return jsonify({"success": True, "message": "Patient registered successfully", "data": new_patient}), 201
 
 
 # --------------------------------------------------------------------------
-# RESTful API Endpoints - Inventory
+# RESTful API Endpoints - Medicine Inventory & Supply
 # --------------------------------------------------------------------------
 @app.route("/api/inventory", methods=["GET"])
 def get_inventory():
@@ -479,7 +655,7 @@ def get_inventory():
 
 @app.route("/api/inventory", methods=["POST"])
 def add_inventory_item():
-    """Adds a new medicine item to inventory."""
+    """Adds a new medicine item to inventory with expiration shelf-life tracking."""
     data = request.get_json() or {}
     item_name = data.get("item_name", "").strip()
     category = data.get("category", "Antihypertensive").strip()
@@ -488,6 +664,7 @@ def add_inventory_item():
     current_stock = int(data.get("current_stock", 0))
     reorder_level = int(data.get("reorder_level", 20))
     unit = data.get("unit", "tabs").strip()
+    expiration_date = data.get("expiration_date") or None
 
     if not item_name:
         return jsonify({"success": False, "error": "Medicine item name is required"}), 400
@@ -499,9 +676,11 @@ def add_inventory_item():
         status = "Low Stock"
 
     item_id = execute_db("""
-        INSERT INTO inventory (item_name, category, batch_no, dosage, current_stock, unit, reorder_level, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (item_name, category, batch_no, dosage, current_stock, unit, reorder_level, status))
+        INSERT INTO inventory (item_name, category, batch_no, dosage, current_stock, unit, reorder_level, status, expiration_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (item_name, category, batch_no, dosage, current_stock, unit, reorder_level, status, expiration_date))
+
+    log_audit_event(None, "INVENTORY_ADDED", f"Added medicine '{item_name}' (Stock: {current_stock} {unit}).")
 
     new_item = query_db("SELECT * FROM inventory WHERE id = ?", (item_id,), one=True)
     return jsonify({"success": True, "message": "Medicine added successfully", "data": new_item}), 201
@@ -532,6 +711,8 @@ def dispense_inventory_item(item_id):
         WHERE id = ?
     """, (current_stock, status, item_id))
 
+    log_audit_event(None, "MEDICINE_DISPENSED", f"Dispensed {qty} {item['unit']} of {item['item_name']}.")
+
     updated = query_db("SELECT * FROM inventory WHERE id = ?", (item_id,), one=True)
     return jsonify({"success": True, "message": f"Dispensed {qty} {item['unit']}.", "data": updated})
 
@@ -540,6 +721,8 @@ def dispense_inventory_item(item_id):
 def request_inventory_restock():
     """Logs and generates an RHU replenishment requisition for low or depleted medicines."""
     low_items = query_db("SELECT * FROM inventory WHERE current_stock <= reorder_level")
+    log_audit_event(None, "RESTOCK_REQUESTED", f"RHU replenishment requested for {len(low_items)} low-stock item(s).")
+
     return jsonify({
         "success": True,
         "message": f"Stock replenishment requisition generated for RHU submission ({len(low_items)} item(s) flagged).",
@@ -557,6 +740,7 @@ def reset_database():
     execute_db("DELETE FROM consultations")
     execute_db("DELETE FROM patients")
     execute_db("DELETE FROM inventory")
+    execute_db("DELETE FROM audit_logs")
     return jsonify({"success": True, "message": "Database successfully reset to clean zero-state."})
 
 
