@@ -125,19 +125,27 @@ async function autoSelectPatientFromRequest() {
  * Displays full demographic, clinical, and contact information for the selected patient.
  */
 function displayPatientInfo(patient) {
-    const card = document.getElementById('patientInfoCard');
-    const autoBadge = document.getElementById('autoLoadedIndicator');
-    if (!card) return;
+    const placeholder = document.getElementById('patientInfoPlaceholder');
+    const content = document.getElementById('patientInfoContent');
+    const condEl = document.getElementById('dispPatientCondition');
 
     if (!patient || !patient.name) {
-        card.classList.add('hidden');
-        if (autoBadge) autoBadge.classList.add('hidden');
+        if (placeholder) placeholder.classList.remove('hidden');
+        if (content) content.classList.add('hidden');
+        if (condEl) {
+            condEl.textContent = 'No Patient Selected';
+            condEl.style.color = 'var(--text-muted)';
+            condEl.style.background = 'var(--bg-surface-secondary)';
+            condEl.style.borderColor = 'var(--border-color)';
+        }
         return;
     }
 
+    if (placeholder) placeholder.classList.add('hidden');
+    if (content) content.classList.remove('hidden');
+
     const nameEl = document.getElementById('dispPatientName');
     const phEl = document.getElementById('dispPatientPhId');
-    const condEl = document.getElementById('dispPatientCondition');
     const ageSexEl = document.getElementById('dispPatientAgeSex');
     const purokEl = document.getElementById('dispPatientPurok');
     const emergEl = document.getElementById('dispPatientEmergency');
@@ -149,7 +157,13 @@ function displayPatientInfo(patient) {
 
     if (nameEl) nameEl.textContent = patient.name;
     if (phEl) phEl.textContent = patient.ph || patient.ph_id || 'N/A';
-    if (condEl) condEl.textContent = patient.condition || 'General Intake';
+    if (condEl) {
+        const cond = patient.condition || 'General Intake';
+        condEl.textContent = cond;
+        condEl.style.color = 'var(--primary)';
+        condEl.style.background = 'var(--bg-surface-secondary)';
+        condEl.style.borderColor = 'var(--primary-border, var(--border-color))';
+    }
 
     const age = (patient.age !== undefined && patient.age !== null && patient.age !== '') ? `${patient.age} yrs` : '--';
     const sex = patient.sex || patient.gender || '--';
@@ -162,7 +176,7 @@ function displayPatientInfo(patient) {
     const emNum = patient.emergency_contact_number || patient.emergencyPhone || '';
     let emText = 'None listed';
     if (emName) {
-        emText = emName + (emRel ? ` (${emRel})` : '') + (emNum ? ` - ${emNum}` : '');
+        emText = emName + (emRel ? ` (${emRel})` : '') + (emNum ? ` • ${emNum}` : '');
     }
     if (emergEl) emergEl.textContent = emText;
 
@@ -176,7 +190,7 @@ function displayPatientInfo(patient) {
     const progs = patient.government_programs || patient.programs || [];
     if (progRow && progEl) {
         if (Array.isArray(progs) && progs.length > 0) {
-            progEl.innerHTML = progs.map(pr => `<span class="badge badge-primary-subtle me-1" style="font-size: 0.7rem;">${escapeHtml(pr)}</span>`).join('');
+            progEl.innerHTML = progs.map(pr => `<span class="badge badge-primary-subtle" style="font-size: 0.72rem; padding: 0.35rem 0.55rem;">${escapeHtml(pr)}</span>`).join('');
             progRow.classList.remove('hidden');
         } else {
             progRow.classList.add('hidden');
@@ -197,9 +211,6 @@ function displayPatientInfo(patient) {
             algRow.classList.add('hidden');
         }
     }
-
-    card.classList.remove('hidden');
-    if (autoBadge) autoBadge.classList.remove('hidden');
 }
 
 // Populate registered patient dropdown dynamically from DB or local state

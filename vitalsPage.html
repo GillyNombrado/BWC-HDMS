@@ -101,51 +101,20 @@
                 <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.2rem;">Record BP, Blood Glucose, BMI, and auto-calculate health risk stratification</p>
             </div>
 
-            <!-- Form & Risk Card Grid -->
+            <!-- Form & Clinical Summary Grid -->
             <div class="grid-consultation">
-                <!-- Encounter Form -->
-                <div class="card-custom">
+                <!-- Left Column: Patient Encounter Form -->
+                <div class="card-custom consultation-form-card">
                     <div class="card-header-custom">
                         <h5 class="card-header-title">Patient Encounter Form</h5>
                     </div>
                     <div class="card-body-custom">
                         <form id="consultForm" onsubmit="submitConsultation(event)">
                             <div class="form-group mb-3">
-                                <div class="d-flex justify-between align-center mb-1">
-                                    <label class="form-label mb-0" for="consultPatient">Select Patient</label>
-                                    <span id="autoLoadedIndicator" class="badge badge-success hidden" style="font-size: 0.72rem;">
-                                        <i class="bi bi-check-circle-fill me-1"></i>Auto-Selected from TCR
-                                    </span>
-                                </div>
+                                <label class="form-label mb-1" for="consultPatient">Select Patient</label>
                                 <select class="form-select" id="consultPatient" required>
                                     <option value="">Choose registered patient...</option>
                                 </select>
-                            </div>
-
-                            <!-- Patient Information Preview Card -->
-                            <div id="patientInfoCard" class="card-custom mb-3 p-3 hidden" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px;">
-                                <div class="d-flex justify-between align-center mb-2">
-                                    <div class="d-flex align-center gap-2">
-                                        <i class="bi bi-person-circle text-primary" style="font-size: 1.35rem;"></i>
-                                        <div>
-                                            <span class="fw-bold text-primary" id="dispPatientName" style="font-size: 1rem;">-</span>
-                                            <span class="text-muted ms-2" style="font-size: 0.78rem;">(PhilHealth ID: <span id="dispPatientPhId" class="fw-semibold text-secondary">-</span>)</span>
-                                        </div>
-                                    </div>
-                                    <span class="badge" id="dispPatientCondition" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.78rem;">-</span>
-                                </div>
-
-                                <div class="grid-3-col mb-2" style="gap: 0.5rem; font-size: 0.8rem;">
-                                    <div><span class="text-muted">Age / Sex:</span> <strong id="dispPatientAgeSex">-</strong></div>
-                                    <div><span class="text-muted">Purok:</span> <strong id="dispPatientPurok">-</strong></div>
-                                    <div><span class="text-muted">Emergency Contact:</span> <strong id="dispPatientEmergency">-</strong></div>
-                                </div>
-
-                                <div class="pt-2 border-top" style="border-color: var(--border-color) !important; font-size: 0.78rem;">
-                                    <div class="mb-1"><span class="text-muted">Address:</span> <span id="dispPatientAddress" class="fw-medium">-</span></div>
-                                    <div id="dispPatientProgramsRow" class="mb-1 hidden"><span class="text-muted">Enrolled Programs:</span> <span id="dispPatientPrograms" class="fw-medium"></span></div>
-                                    <div id="dispPatientAllergiesRow" class="hidden"><span class="text-muted">Known Allergies / Risks:</span> <span id="dispPatientAllergies" class="text-danger fw-semibold"></span></div>
-                                </div>
                             </div>
 
                             <div class="grid-2-col mb-2">
@@ -179,9 +148,9 @@
                                 <input type="text" class="form-control" id="bmiResult" readonly value="Enter weight and height...">
                             </div>
 
-                            <div class="form-group mb-4">
+                            <div class="form-group mb-4" style="flex: 1; display: flex; flex-direction: column;">
                                 <label class="form-label" for="consultRemarks">Prescribed Medicines / Remarks</label>
-                                <textarea class="form-control" id="consultRemarks" rows="3" placeholder="Enter maintenance meds dispensed or lifestyle advice given..."></textarea>
+                                <textarea class="form-control" id="consultRemarks" rows="6" placeholder="Enter maintenance meds dispensed or lifestyle advice given..." style="min-height: 140px; flex: 1; resize: vertical;"></textarea>
                             </div>
 
                             <button type="submit" class="btn btn-primary btn-full py-2 fw-semibold">
@@ -191,16 +160,91 @@
                     </div>
                 </div>
 
-                <!-- Automated Risk Stratification Box -->
-                <div class="card-custom">
-                    <div class="card-header-custom">
-                        <h5 class="card-header-title">Automated Risk Stratification</h5>
+                <!-- Right Column: Automated Risk Stratification + Patient Information (Fixed Card) -->
+                <div class="vitals-sidebar-column">
+                    <!-- Automated Risk Stratification Card (Fixed Size) -->
+                    <div class="card-custom risk-card-fixed">
+                        <div class="card-header-custom">
+                            <h5 class="card-header-title">Automated Risk Stratification</h5>
+                        </div>
+                        <div class="card-body-custom">
+                            <div id="riskDisplayBox" class="risk-box">
+                                <i class="bi bi-shield-exclamation risk-icon text-muted" id="riskIcon"></i>
+                                <h4 class="risk-title" id="riskTitle">Awaiting Readings</h4>
+                                <p class="risk-desc text-muted mb-0" id="riskDesc">Input blood pressure and blood glucose values to instantly evaluate cardiovascular and metabolic risk according to DOH guidelines.</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body-custom d-flex flex-column align-center justify-between" style="min-height: 280px;">
-                        <div id="riskDisplayBox" class="risk-box">
-                            <i class="bi bi-shield-exclamation risk-icon text-muted" id="riskIcon"></i>
-                            <h4 class="risk-title" id="riskTitle">Awaiting Readings</h4>
-                            <p class="risk-desc text-muted" id="riskDesc">Input blood pressure and blood glucose values to instantly evaluate cardiovascular and metabolic risk according to DOH guidelines.</p>
+
+                    <!-- Patient Information Preview Fixed Card (Aligned to Bottom) -->
+                    <div class="card-custom patient-info-fixed" id="patientInfoCard">
+                        <div class="card-header-custom">
+                            <div class="d-flex align-center gap-2">
+                                <i class="bi bi-person-vcard text-primary" style="font-size: 1.15rem;"></i>
+                                <h5 class="card-header-title">Patient Information</h5>
+                            </div>
+                            <span class="badge" id="dispPatientCondition" style="background: var(--bg-surface-secondary); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.78rem;">
+                                No Patient Selected
+                            </span>
+                        </div>
+                        <div class="card-body-custom">
+                            <!-- Placeholder State -->
+                            <div id="patientInfoPlaceholder" class="text-center py-4 d-flex flex-column align-center justify-center" style="color: var(--text-muted); flex: 1;">
+                                <i class="bi bi-person-badge text-muted" style="font-size: 2.5rem; opacity: 0.45; display: block; margin-bottom: 0.75rem;"></i>
+                                <div class="fw-semibold mb-1" style="font-size: 0.95rem; color: var(--text-main);">No Patient Selected</div>
+                                <p class="mb-0 text-muted" style="font-size: 0.82rem; line-height: 1.5; max-width: 320px;">
+                                    Select a patient from the encounter form to view demographic records, emergency contact, and programs.
+                                </p>
+                            </div>
+
+                            <!-- Populated Content State -->
+                            <div id="patientInfoContent" class="hidden" style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                <div>
+                                    <div class="d-flex justify-between align-center pb-3 mb-3 border-bottom" style="border-color: var(--border-color) !important;">
+                                        <div class="d-flex align-center gap-2">
+                                            <i class="bi bi-person-circle text-primary" style="font-size: 1.5rem;"></i>
+                                            <div>
+                                                <span class="fw-bold text-primary" id="dispPatientName" style="font-size: 1.05rem;">-</span>
+                                                <div class="text-muted" style="font-size: 0.78rem;">
+                                                    PhilHealth ID: <span id="dispPatientPhId" class="fw-semibold text-secondary">-</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid-2-col mb-3" style="gap: 0.85rem; font-size: 0.82rem;">
+                                        <div class="patient-info-chip">
+                                            <div class="text-muted" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Age / Sex</div>
+                                            <strong id="dispPatientAgeSex" style="color: var(--text-main); font-size: 0.85rem;">-</strong>
+                                        </div>
+                                        <div class="patient-info-chip">
+                                            <div class="text-muted" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Purok</div>
+                                            <strong id="dispPatientPurok" style="color: var(--text-main); font-size: 0.85rem;">-</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="patient-info-chip mb-3" style="font-size: 0.82rem;">
+                                        <div class="text-muted" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Emergency Contact</div>
+                                        <strong id="dispPatientEmergency" style="color: var(--text-main); font-size: 0.85rem; word-break: break-word;">-</strong>
+                                    </div>
+
+                                    <div class="patient-info-chip mb-3" style="font-size: 0.82rem;">
+                                        <div class="text-muted" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem;">Complete Address</div>
+                                        <span id="dispPatientAddress" class="fw-medium" style="color: var(--text-main); font-size: 0.85rem; line-height: 1.4;">-</span>
+                                    </div>
+                                </div>
+
+                                <div class="pt-2 border-top" style="border-color: var(--border-color) !important; font-size: 0.8rem;">
+                                    <div id="dispPatientProgramsRow" class="mb-2 hidden">
+                                        <span class="text-muted d-block mb-1" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600;">Enrolled Programs:</span>
+                                        <div id="dispPatientPrograms" class="d-flex flex-wrap gap-1"></div>
+                                    </div>
+                                    <div id="dispPatientAllergiesRow" class="hidden">
+                                        <span class="text-muted d-block mb-1" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600;">Known Allergies / Risks:</span>
+                                        <span id="dispPatientAllergies" class="text-danger fw-semibold" style="line-height: 1.4;"></span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
