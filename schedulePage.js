@@ -7,27 +7,40 @@
    This module handles the schedule tab operations:
    1. Live Server Date & Time Clock widget (updates every second).
    2. Offline-First data synchronization with Flask/SQLite backend or LocalStorage.
-   3. Dynamic month, category, and status filtering for health workers.
-   4. Automatic "Defaulted" status evaluation for overdue pending appointments.
-   5. Interactive Table Action buttons: "Mark Completed", "Reschedule", "Reopen".
-   6. Reschedule Modal handling & date recalculation.
-   7. New schedule creation for client follow-ups and Purok assemblies.
+   3. Strict Patient Privacy Boundary: Logged-in BHW only sees patient appointments
+      assigned to their care; general upcoming events are visible to all users.
+   4. Historical Date Selectors: Year integer counter/selector and month dropdown
+      defaulting to current live year and month.
+   5. Dynamic enumerated type filtering (appointments + upcoming community events).
+   6. Chronological date sorting from closest to latest date.
+   7. Expandable event details with 4-word truncation and message bubble modal.
+   8. New schedule entry modal styled after the add-medicine-supply UI pattern.
    ========================================================================== */
 
-// Storage keys & Backend API URL
+// Storage keys & Backend API URLs
 const STORAGE_KEY_APPOINTMENTS = 'bwc_appointments_db';
 const BACKEND_API_URL = 'http://127.0.0.1:5000/api/appointments';
+const BACKEND_EVENTS_URL = 'http://127.0.0.1:5000/api/upcoming-events';
 
-// In-memory appointments list
+// In-memory combined schedule list (appointments + upcoming events)
 let scheduleData = [];
+
+// Enumerated Upcoming Event Types
+const EVENT_TYPES = [
+    'Health Campaign',
+    'Community Assembly',
+    'Admin Meeting',
+    'Training Seminar',
+    'Outreach Mission'
+];
+
+function isUpcomingEventType(type) {
+    return EVENT_TYPES.includes(type);
+}
 
 // --------------------------------------------------------------------------
 // 1. Live Server Date & Time Clock Widget
 // --------------------------------------------------------------------------
-/**
- * Starts a real-time interval clock displaying current server/system date & time.
- * Updates #liveClockDate and #liveClockTime every 1,000 milliseconds.
- */
 function initLiveServerClock() {
     const dateEl = document.getElementById('liveClockDate');
     const timeEl = document.getElementById('liveClockTime');
@@ -35,16 +48,12 @@ function initLiveServerClock() {
 
     function tick() {
         const now = new Date();
-
-        // Format Date: e.g. "Thu, Nov 12, 2026"
         const dateString = now.toLocaleDateString('en-US', {
             weekday: 'short',
             month: 'short',
             day: 'numeric',
             year: 'numeric'
         });
-
-        // Format Time: e.g. "09:12:45 PM"
         const timeString = now.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
@@ -56,26 +65,25 @@ function initLiveServerClock() {
         if (timeEl) timeEl.textContent = timeString;
     }
 
-    // Run initial tick immediately, then set interval
     tick();
     setInterval(tick, 1000);
 }
 
 // --------------------------------------------------------------------------
-// 2. Initial Schedule Data Layer (Clean Zero State)
+// 2. Historical Year Navigation Helper
 // --------------------------------------------------------------------------
-function getInitialSeedAppointments() {
-    // Pristine empty array for clean database imports and live testing
-    return [];
+function adjustYear(delta) {
+    const yEl = document.getElementById('filterYear');
+    if (yEl) {
+        const cur = parseInt(yEl.value, 10) || new Date().getFullYear();
+        yEl.value = cur + delta;
+        renderSchedule();
+    }
 }
 
 // --------------------------------------------------------------------------
 // 3. Data Synchronization & Persistence Layer (Starts Clean / Empty State)
 // --------------------------------------------------------------------------
-/**
- * Loads appointments from localStorage.
- * Automatically checks and flags overdue 'Pending' appointments as 'Defaulted'.
- */
 function loadAppointmentsFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY_APPOINTMENTS);
     let appts = [];
@@ -84,24 +92,19 @@ function loadAppointmentsFromStorage() {
             appts = JSON.parse(raw);
         } catch (e) {
             console.error("Error parsing local appointment data:", e);
-            appts = getInitialSeedAppointments();
+            appts = [];
         }
-    } else {
-        appts = getInitialSeedAppointments();
-        saveAppointmentsToStorage(appts);
     }
 
-    // Auto-status validation:
-    // If appointment is 'Pending' and scheduledDate < today, mark as 'Defaulted'
     const todayStr = new Date().toISOString().split('T')[0];
     let hasStatusChanges = false;
 
-    appts = appts.map(appt => {
-        if (appt.status === 'Pending' && appt.scheduledDate < todayStr) {
-            appt.status = 'Defaulted';
+    appts = appts.map(item => {
+        if (item.status === 'Pending' && item.scheduledDate < todayStr) {
+            item.status = 'Defaulted';
             hasStatusChanges = true;
         }
-        return appt;
+        return item;
     });
 
     if (hasStatusChanges) {
@@ -111,49 +114,92 @@ function loadAppointmentsFromStorage() {
     return appts;
 }
 
-/**
- * Persists appointments array to localStorage.
- */
 function saveAppointmentsToStorage(appts) {
     localStorage.setItem(STORAGE_KEY_APPOINTMENTS, JSON.stringify(appts));
 }
 
 /**
- * Attempts to fetch latest appointments from Flask/SQLite backend.
- * Falls back seamlessly to offline localStorage if server is unreachable.
+ * Synchronizes with Flask/SQLite backend:
+ * - Patient Appointments: strictly queries appointments for logged-in BHW (Privacy Boundary)
+ * - General Upcoming Events: queries community events visible to all users
  */
 async function syncWithBackend() {
+    const authUser = sessionStorage.getItem('bwc_user') || 'charisma';
+    const authId = sessionStorage.getItem('bwc_user_id') || '26-001';
+
+    let appointments = [];
+    let events = [];
+
+    // 1. Fetch Patient Appointments (enforcing Privacy Boundary)
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
-
-        const response = await fetch(BACKEND_API_URL, { signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), 1800);
+        const resp = await fetch(`${BACKEND_API_URL}?username=${encodeURIComponent(authUser)}&user_id=${encodeURIComponent(authId)}`, {
+            signal: controller.signal,
+            headers: { 'X-Username': authUser, 'X-User-Id': authId }
+        });
         clearTimeout(timeoutId);
 
-        if (response.ok) {
-            const result = await response.json();
-            if (result.success && Array.isArray(result.data) && result.data.length > 0) {
-                // Map backend SQLite snake_case fields to frontend camelCase
-                scheduleData = result.data.map(item => ({
+        if (resp.ok) {
+            const result = await resp.json();
+            if (result.success && Array.isArray(result.data)) {
+                appointments = result.data.map(item => ({
                     id: item.id,
+                    isEvent: false,
+                    entryType: 'appointment',
                     patientName: item.patient_name,
                     category: item.category,
                     scheduledDate: item.scheduled_date,
                     purok: item.purok,
+                    location: item.purok || 'Barangay Health Station',
                     remarks: item.remarks,
+                    details: item.remarks || '',
                     status: item.status,
                     completedDate: item.completed_date
                 }));
-                saveAppointmentsToStorage(scheduleData);
-                console.log("Successfully synchronized with Flask / SQLite backend.");
-                return;
             }
         }
-    } catch (err) {
-        console.info("Flask backend offline. Running via LocalStorage persistence.");
+    } catch (e) {
+        console.info("Appointments fetch fallback:", e);
     }
 
-    // Fallback: Read from LocalStorage
+    // 2. Fetch General Upcoming Events (community-wide, visible to all)
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1800);
+        const resp = await fetch(BACKEND_EVENTS_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (resp.ok) {
+            const result = await resp.json();
+            if (result.success && Array.isArray(result.data)) {
+                events = result.data.map(item => ({
+                    id: item.id,
+                    isEvent: true,
+                    entryType: 'event',
+                    patientName: item.type,
+                    category: item.type,
+                    scheduledDate: item.date,
+                    purok: item.location,
+                    location: item.location || 'Poblacion 2',
+                    remarks: item.details,
+                    details: item.details,
+                    status: item.status,
+                    completedDate: item.completed_at
+                }));
+            }
+        }
+    } catch (e) {
+        console.info("Events fetch fallback:", e);
+    }
+
+    if (appointments.length > 0 || events.length > 0) {
+        scheduleData = [...appointments, ...events];
+        saveAppointmentsToStorage(scheduleData);
+        return;
+    }
+
+    // Fallback: LocalStorage
     scheduleData = loadAppointmentsFromStorage();
 }
 
@@ -161,13 +207,20 @@ async function syncWithBackend() {
 // 4. UI Rendering Engine & Filtering
 // --------------------------------------------------------------------------
 /**
- * Renders schedule rows inside #scheduleTableBody based on active filter selections.
+ * Renders schedule rows inside #scheduleTableBody based on active filter selections:
+ * - Year integer counter/selector
+ * - Month dropdown selector (0-11, or "" for all)
+ * - Enumerated Type filter (Appointment + Upcoming Event types)
+ * - Status filter (Pending, Defaulted, Completed)
+ * Sorts chronologically from closest date to latest date.
  */
 function renderSchedule() {
     const tableBody = document.getElementById('scheduleTableBody');
     if (!tableBody) return;
 
-    // Filter values
+    const yearInput = document.getElementById('filterYear');
+    const selectedYear = yearInput ? yearInput.value.trim() : "";
+
     const monthSelect = document.getElementById('filterMonth');
     const selectedMonth = monthSelect ? monthSelect.value : "";
     
@@ -181,20 +234,34 @@ function renderSchedule() {
 
     // Filter items
     const filtered = scheduleData.filter(item => {
-        // 1. Month filter (0 = Jan, 11 = Dec)
-        if (selectedMonth !== "") {
-            const itemDate = new Date(item.scheduledDate + 'T00:00:00');
-            if (itemDate.getMonth() !== parseInt(selectedMonth, 10)) {
-                return false;
+        if (!item.scheduledDate) return false;
+
+        const parts = item.scheduledDate.split('-');
+        if (parts.length >= 2) {
+            const itemYear = parseInt(parts[0], 10);
+            const itemMonthIdx = parseInt(parts[1], 10) - 1; // 0-based month
+
+            // 1. Year filter
+            if (selectedYear !== "") {
+                if (itemYear !== parseInt(selectedYear, 10)) {
+                    return false;
+                }
+            }
+
+            // 2. Month filter (0 = Jan, 11 = Dec)
+            if (selectedMonth !== "") {
+                if (itemMonthIdx !== parseInt(selectedMonth, 10)) {
+                    return false;
+                }
             }
         }
 
-        // 2. Category filter
+        // 3. Category / Type filter
         if (selectedCategory && item.category !== selectedCategory) {
             return false;
         }
 
-        // 3. Status filter
+        // 4. Status filter
         if (selectedStatus && item.status !== selectedStatus) {
             return false;
         }
@@ -202,7 +269,7 @@ function renderSchedule() {
         return true;
     });
 
-    // Sort by scheduledDate ascending
+    // Chronological date sorting: closest date to latest date
     filtered.sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
 
     // Clear previous rows
@@ -215,7 +282,7 @@ function renderSchedule() {
                 <td colspan="5" class="text-center py-5 text-muted">
                     <i class="bi bi-calendar-x d-block mb-2" style="font-size: 2rem; color: var(--text-muted); opacity: 0.6;"></i>
                     <span class="fw-semibold" style="font-size: 0.95rem;">No scheduled check-ups or events match the selected criteria.</span>
-                    <p class="text-muted mb-0" style="font-size: 0.8rem; margin-top: 0.25rem;">Try selecting "All Months" or reset your category and status filters.</p>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem; margin-top: 0.25rem;">Try adjusting the year or month selector, or reset your type and status filters.</p>
                 </td>
             </tr>
         `;
@@ -226,7 +293,7 @@ function renderSchedule() {
     filtered.forEach(item => {
         const row = document.createElement('tr');
         
-        // Relative date indicator (Today, Past Due, etc.)
+        // Relative date badge (Today, Past Due, etc.)
         let dateBadge = '';
         if (item.scheduledDate === todayStr) {
             dateBadge = `<span class="badge badge-primary-subtle ms-2" style="font-size: 0.65rem;">TODAY</span>`;
@@ -234,7 +301,7 @@ function renderSchedule() {
             dateBadge = `<span class="badge badge-danger-subtle ms-2" style="font-size: 0.65rem;">PAST DUE</span>`;
         }
 
-        // Formatted display date (e.g., Nov 12, 2026)
+        // Formatted display date (e.g., Nov 18, 2026)
         const dateObj = new Date(item.scheduledDate + 'T00:00:00');
         const formattedDate = dateObj.toLocaleDateString('en-US', {
             month: 'short',
@@ -246,15 +313,52 @@ function renderSchedule() {
         const categoryBadge = getCategoryBadge(item.category);
         const statusBadge = getStatusBadge(item.status);
 
+        // Details & Location presentation
+        let detailsHtml = '';
+        if (item.isEvent) {
+            // Event Details Truncation & Expansion: truncate after 4 words with "..."
+            const words = (item.details || '').trim().split(/\s+/).filter(Boolean);
+            if (words.length > 4) {
+                const truncated = words.slice(0, 4).join(' ') + '...';
+                detailsHtml = `
+                    <div class="event-details-trigger d-inline-flex align-center gap-1.5" onclick="openEventBubble(${item.id})" title="Click to view full description" style="cursor: pointer;">
+                        <span class="fw-bold" style="color: var(--text-heading); font-size: 0.85rem;">${escapeHtml(truncated)}</span>
+                        <span class="badge badge-primary-subtle" style="font-size: 0.65rem; padding: 0.15rem 0.35rem; cursor: pointer;" title="View details">
+                            <i class="bi bi-chat-text-fill"></i>
+                        </span>
+                    </div>
+                `;
+            } else {
+                detailsHtml = `<div class="fw-bold" style="color: var(--text-heading); font-size: 0.85rem;">${escapeHtml(item.details || item.patientName)}</div>`;
+            }
+            // Display location directly below details
+            detailsHtml += `
+                <div class="text-muted" style="font-size: 0.75rem; margin-top: 0.15rem;">
+                    <i class="bi bi-geo-alt-fill text-primary me-1"></i>${escapeHtml(item.location || 'Poblacion 2')}
+                </div>
+            `;
+        } else {
+            // Patient Appointment: bold patient name, location and remarks below
+            detailsHtml = `
+                <div class="fw-bold" style="color: var(--text-heading); font-size: 0.85rem;">
+                    ${escapeHtml(item.patientName)}
+                </div>
+                <div class="text-muted" style="font-size: 0.75rem; margin-top: 0.15rem;">
+                    <i class="bi bi-geo-alt-fill text-primary me-1"></i>${escapeHtml(item.location || item.purok || 'Barangay Health Station')}
+                    ${item.remarks ? ` &bull; <span>${escapeHtml(item.remarks)}</span>` : ''}
+                </div>
+            `;
+        }
+
         // Action Buttons in "ACTION" column
         let actionButtons = '';
         if (item.status === 'Completed') {
             actionButtons = `
                 <div class="d-flex justify-end align-center gap-1">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAppointmentStatus(${item.id})" title="Re-open / Mark as Pending">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAppointmentStatus(${item.id}, ${item.isEvent})" title="Re-open / Mark as Pending">
                         <i class="bi bi-arrow-counterclockwise me-1"></i>Reopen
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="openRescheduleModal(${item.id})" title="Reschedule Date">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="openRescheduleModal(${item.id}, ${item.isEvent})" title="Reschedule Date">
                         <i class="bi bi-calendar-event me-1"></i>Reschedule
                     </button>
                 </div>
@@ -262,13 +366,13 @@ function renderSchedule() {
         } else {
             actionButtons = `
                 <div class="d-flex justify-end align-center gap-1" style="flex-wrap: wrap;">
-                    <button type="button" class="btn btn-sm btn-outline-success" onclick="markAppointmentCompleted(${item.id})" title="Mark Completed">
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="markAppointmentCompleted(${item.id}, ${item.isEvent})" title="Mark Completed">
                         <i class="bi bi-check-lg me-1"></i>Mark Completed
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="openRescheduleModal(${item.id})" title="Reschedule Date">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="openRescheduleModal(${item.id}, ${item.isEvent})" title="Reschedule Date">
                         <i class="bi bi-calendar-event me-1"></i>Reschedule
                     </button>
-                    ${item.category !== 'Purok Assembly' ? `
+                    ${(!item.isEvent && item.category !== 'Purok Assembly') ? `
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="proceedToConsultation('${escapeHtml(item.patientName)}')" title="Start Consultation">
                         <i class="bi bi-clipboard2-pulse"></i>
                     </button>` : ''}
@@ -282,15 +386,7 @@ function renderSchedule() {
                 <div class="text-muted" style="font-size: 0.75rem; font-weight: normal;">${item.scheduledDate}</div>
             </td>
             <td>${categoryBadge}</td>
-            <td>
-                <div class="fw-bold" style="color: var(--text-heading); font-size: 0.85rem;">
-                    ${escapeHtml(item.patientName)}
-                </div>
-                <div class="text-muted" style="font-size: 0.75rem; margin-top: 0.15rem;">
-                    <i class="bi bi-geo-alt-fill text-primary me-1"></i>${escapeHtml(item.purok || 'Barangay Health Station')}
-                    ${item.remarks ? ` &bull; <span>${escapeHtml(item.remarks)}</span>` : ''}
-                </div>
-            </td>
+            <td>${detailsHtml}</td>
             <td>${statusBadge}</td>
             <td class="text-right pe-4">${actionButtons}</td>
         `;
@@ -299,9 +395,6 @@ function renderSchedule() {
     });
 }
 
-/**
- * Returns styled HTML badge markup for scheduling category.
- */
 function getCategoryBadge(category) {
     switch (category) {
         case 'Monthly HPN Check':
@@ -312,14 +405,17 @@ function getCategoryBadge(category) {
             return `<span class="badge badge-warning"><i class="bi bi-capsule me-1"></i>Medicine Refill</span>`;
         case 'Purok Assembly':
             return `<span class="badge badge-success"><i class="bi bi-megaphone-fill me-1"></i>Purok Assembly</span>`;
+        case 'Health Campaign':
+        case 'Community Assembly':
+        case 'Admin Meeting':
+        case 'Training Seminar':
+        case 'Outreach Mission':
+            return `<span class="badge badge-secondary-subtle">${escapeHtml(category)}</span>`;
         default:
             return `<span class="badge badge-secondary-subtle">${escapeHtml(category)}</span>`;
     }
 }
 
-/**
- * Returns styled HTML badge markup for status.
- */
 function getStatusBadge(status) {
     switch (status) {
         case 'Completed':
@@ -333,86 +429,107 @@ function getStatusBadge(status) {
 }
 
 // --------------------------------------------------------------------------
-// 5. Interactive Table Actions: Complete, Reopen, Reschedule
+// 5. Expandable Event Details Message Bubble Modal
 // --------------------------------------------------------------------------
-/**
- * Direct action to mark an appointment as Completed.
- * Updates badge to green and saves timestamp.
- */
-async function markAppointmentCompleted(id) {
-    const appt = scheduleData.find(a => a.id === id);
-    if (!appt) return;
+function openEventBubble(id) {
+    const item = scheduleData.find(a => a.id === id && a.isEvent);
+    if (!item) return;
+
+    const typeEl = document.getElementById('bubbleEventType');
+    const dateEl = document.getElementById('bubbleEventDate');
+    const detailsEl = document.getElementById('bubbleEventDetails');
+    const locEl = document.getElementById('bubbleEventLocation');
+
+    const dateObj = new Date(item.scheduledDate + 'T00:00:00');
+    const formatted = dateObj.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+    });
+
+    if (typeEl) typeEl.textContent = item.category || 'Event Details';
+    if (dateEl) dateEl.textContent = formatted;
+    if (detailsEl) detailsEl.textContent = item.details || 'No additional details recorded.';
+    if (locEl) locEl.textContent = item.location || 'Poblacion 2';
+
+    openModal('eventBubbleModal');
+}
+
+function closeEventBubble() {
+    closeModal('eventBubbleModal');
+}
+
+// --------------------------------------------------------------------------
+// 6. Interactive Table Actions: Complete, Reopen, Reschedule
+// --------------------------------------------------------------------------
+async function markAppointmentCompleted(id, isEvent = false) {
+    const item = scheduleData.find(a => a.id === id && a.isEvent === isEvent);
+    if (!item) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
-    appt.status = 'Completed';
-    appt.completedDate = todayStr;
+    item.status = 'Completed';
+    item.completedDate = todayStr;
 
     saveAppointmentsToStorage(scheduleData);
     renderSchedule();
-    showNotification(`Appointment for ${appt.patientName} marked as Completed.`, 'success');
+    showNotification(`${item.patientName || item.category} marked as Completed.`, 'success');
 
-    // Attempt background sync with Flask backend
     try {
-        await fetch(`${BACKEND_API_URL}/${id}/status`, {
+        const url = isEvent ? `${BACKEND_EVENTS_URL}/${id}/status` : `${BACKEND_API_URL}/${id}/status`;
+        await fetch(url, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'Completed' })
         });
-    } catch (e) {
-        // Handled silently in offline mode
-    }
+    } catch (e) {}
 }
 
-/**
- * Re-opens a Completed appointment back to Pending or Defaulted depending on scheduled date.
- */
-async function toggleAppointmentStatus(id) {
-    const appt = scheduleData.find(a => a.id === id);
-    if (!appt) return;
+async function toggleAppointmentStatus(id, isEvent = false) {
+    const item = scheduleData.find(a => a.id === id && a.isEvent === isEvent);
+    if (!item) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
     let newStatus = 'Completed';
 
-    if (appt.status === 'Completed') {
-        newStatus = appt.scheduledDate < todayStr ? 'Defaulted' : 'Pending';
-        appt.completedDate = null;
+    if (item.status === 'Completed') {
+        newStatus = item.scheduledDate < todayStr ? 'Defaulted' : 'Pending';
+        item.completedDate = null;
     } else {
         newStatus = 'Completed';
-        appt.completedDate = todayStr;
+        item.completedDate = todayStr;
     }
 
-    appt.status = newStatus;
+    item.status = newStatus;
     saveAppointmentsToStorage(scheduleData);
     renderSchedule();
 
-    showNotification(`Status updated to ${newStatus} for ${appt.patientName}.`, 'success');
+    showNotification(`Status updated to ${newStatus} for ${item.patientName || item.category}.`, 'success');
 
     try {
-        await fetch(`${BACKEND_API_URL}/${id}/status`, {
+        const url = isEvent ? `${BACKEND_EVENTS_URL}/${id}/status` : `${BACKEND_API_URL}/${id}/status`;
+        await fetch(url, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: newStatus })
         });
-    } catch (e) {
-        // Handled silently in offline mode
-    }
+    } catch (e) {}
 }
 
-/**
- * Opens the Reschedule Modal pre-filled with the selected appointment's data.
- */
-function openRescheduleModal(id) {
-    const appt = scheduleData.find(a => a.id === id);
-    if (!appt) return;
+function openRescheduleModal(id, isEvent = false) {
+    const item = scheduleData.find(a => a.id === id && a.isEvent === isEvent);
+    if (!item) return;
 
     const idInput = document.getElementById('reschedApptId');
+    const isEvtInput = document.getElementById('reschedIsEvent');
     const subtitle = document.getElementById('reschedPatientSubtitle');
     const dateInput = document.getElementById('reschedNewDate');
     const reasonInput = document.getElementById('reschedReason');
 
-    if (idInput) idInput.value = appt.id;
-    if (subtitle) subtitle.textContent = `${appt.patientName} &bull; ${appt.category}`;
-    if (dateInput) dateInput.value = appt.scheduledDate;
+    if (idInput) idInput.value = item.id;
+    if (isEvtInput) isEvtInput.value = item.isEvent ? 'true' : 'false';
+    if (subtitle) subtitle.innerHTML = `${escapeHtml(item.patientName || item.category)} &bull; ${escapeHtml(item.category)}`;
+    if (dateInput) dateInput.value = item.scheduledDate;
     if (reasonInput) reasonInput.value = '';
 
     openModal('rescheduleModal');
@@ -422,12 +539,10 @@ function closeRescheduleModal() {
     closeModal('rescheduleModal');
 }
 
-/**
- * Confirms appointment rescheduling, updates date, evaluates status, and persists.
- */
 async function confirmReschedule(e) {
     e.preventDefault();
     const id = parseInt(document.getElementById('reschedApptId').value, 10);
+    const isEvent = document.getElementById('reschedIsEvent')?.value === 'true';
     const newDate = document.getElementById('reschedNewDate').value;
     const reason = document.getElementById('reschedReason').value.trim();
 
@@ -436,52 +551,60 @@ async function confirmReschedule(e) {
         return;
     }
 
-    const appt = scheduleData.find(a => a.id === id);
-    if (!appt) return;
+    const item = scheduleData.find(a => a.id === id && a.isEvent === isEvent);
+    if (!item) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const oldDate = appt.scheduledDate;
+    const oldDate = item.scheduledDate;
 
-    // Update fields
-    appt.scheduledDate = newDate;
-    appt.status = newDate < todayStr ? 'Defaulted' : 'Pending';
-    appt.completedDate = null;
+    item.scheduledDate = newDate;
+    item.status = newDate < todayStr ? 'Defaulted' : 'Pending';
+    item.completedDate = null;
 
-    // Append audit note into remarks
     const appendNote = `Rescheduled from ${oldDate} to ${newDate}${reason ? `: ${reason}` : ''}`;
-    appt.remarks = appt.remarks ? `${appt.remarks} | ${appendNote}` : appendNote;
+    item.remarks = item.remarks ? `${item.remarks} | ${appendNote}` : appendNote;
+    item.details = item.remarks;
 
     saveAppointmentsToStorage(scheduleData);
     closeRescheduleModal();
     renderSchedule();
-    showNotification(`Rescheduled ${appt.patientName} to ${newDate}.`, 'success');
+    showNotification(`Rescheduled to ${newDate}.`, 'success');
 
-    // Attempt backend sync with Flask/SQLite
     try {
-        await fetch(`${BACKEND_API_URL}/${id}/reschedule`, {
+        const url = isEvent ? `${BACKEND_EVENTS_URL}/${id}/reschedule` : `${BACKEND_API_URL}/${id}/reschedule`;
+        await fetch(url, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                new_date: newDate,
                 scheduled_date: newDate,
                 reason: reason
             })
         });
-    } catch (e) {
-        // Handled silently in offline mode
-    }
+    } catch (e) {}
 }
 
-/**
- * Quick action to jump straight to vitals consultation form for the selected patient.
- */
 function proceedToConsultation(patientName) {
     sessionStorage.setItem('consult_patient', patientName);
     window.location.href = `vitalsPage.html?patient=${encodeURIComponent(patientName)}`;
 }
 
 // --------------------------------------------------------------------------
-// 6. Modal Handling: New Schedule Entry Creation
+// 7. Modal Handling: New Schedule Entry Creation (Bubble Pattern)
 // --------------------------------------------------------------------------
+function handleSchedTypeChange() {
+    const cat = document.getElementById('schedCategory').value;
+    const lbl = document.getElementById('lblSchedTarget');
+    const input = document.getElementById('schedPatientName');
+    if (isUpcomingEventType(cat)) {
+        if (lbl) lbl.innerHTML = 'Event Target / Beneficiaries <span class="text-danger">*</span>';
+        if (input) input.placeholder = 'e.g. Barangay Residents, Senior Citizens, BHW Staff';
+    } else {
+        if (lbl) lbl.innerHTML = 'Target Client / Beneficiary <span class="text-danger">*</span>';
+        if (input) input.placeholder = 'e.g. Juan Dela Cruz';
+    }
+}
+
 function openScheduleModal() {
     const modal = document.getElementById('scheduleModal');
     if (!modal) return;
@@ -489,13 +612,14 @@ function openScheduleModal() {
     const form = document.getElementById('newScheduleForm');
     if (form) form.reset();
 
-    // Populate patient suggestions dynamically from TCR storage
     const datalist = document.getElementById('patientSuggestions');
     if (datalist) {
         datalist.innerHTML = `
             <option value="Barangay Residents - Purok 1">
             <option value="Barangay Residents - Purok 2">
             <option value="Barangay Residents - Purok 3">
+            <option value="Hypertension & Diabetes Patients">
+            <option value="Senior Citizens Circle">
         `;
         try {
             const raw = localStorage.getItem('bwc_patients_db');
@@ -510,7 +634,6 @@ function openScheduleModal() {
         } catch (e) {}
     }
 
-    // Default scheduled date to tomorrow
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const dateInput = document.getElementById('schedDate');
@@ -518,6 +641,7 @@ function openScheduleModal() {
         dateInput.value = tomorrow.toISOString().split('T')[0];
     }
 
+    handleSchedTypeChange();
     openModal('scheduleModal');
 }
 
@@ -525,16 +649,13 @@ function closeScheduleModal() {
     closeModal('scheduleModal');
 }
 
-/**
- * Handles submission of new schedule form.
- */
 async function saveScheduleEntry(e) {
     e.preventDefault();
 
     const category = document.getElementById('schedCategory').value;
     const patientName = document.getElementById('schedPatientName').value.trim();
     const scheduledDate = document.getElementById('schedDate').value;
-    const purok = document.getElementById('schedPurok').value;
+    const location = document.getElementById('schedPurok').value.trim();
     const remarks = document.getElementById('schedRemarks').value.trim();
 
     if (!patientName || !scheduledDate) {
@@ -544,44 +665,70 @@ async function saveScheduleEntry(e) {
 
     const todayStr = new Date().toISOString().split('T')[0];
     const initialStatus = scheduledDate < todayStr ? 'Defaulted' : 'Pending';
+    const isEvt = isUpcomingEventType(category);
 
-    const newAppointment = {
+    const newEntry = {
         id: Date.now(),
-        patientName: patientName,
+        isEvent: isEvt,
+        entryType: isEvt ? 'event' : 'appointment',
         category: category,
+        patientName: patientName,
         scheduledDate: scheduledDate,
-        purok: purok,
+        purok: location,
+        location: location,
         remarks: remarks,
+        details: remarks,
         status: initialStatus,
         completedDate: null
     };
 
-    scheduleData.push(newAppointment);
+    scheduleData.push(newEntry);
     saveAppointmentsToStorage(scheduleData);
 
     closeScheduleModal();
     renderSchedule();
-    showNotification(`New schedule entry added for ${patientName}`, 'success');
+    showNotification(`New schedule entry added: ${category}`, 'success');
 
     try {
-        await fetch(BACKEND_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                patient_name: patientName,
-                category: category,
-                scheduled_date: scheduledDate,
-                purok: purok,
-                remarks: remarks,
-                status: initialStatus
-            })
-        });
-    } catch (e) {
-        // Handled silently in offline mode
-    }
+        if (isEvt) {
+            const resp = await fetch(BACKEND_EVENTS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date: scheduledDate,
+                    type: category,
+                    details: remarks || patientName,
+                    location: location,
+                    status: initialStatus
+                })
+            });
+            if (resp.ok) {
+                const resData = await resp.json();
+                if (resData.data && resData.data.id) newEntry.id = resData.data.id;
+            }
+        } else {
+            const authId = sessionStorage.getItem('bwc_user_id') || '26-001';
+            const resp = await fetch(BACKEND_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_name: patientName,
+                    category: category,
+                    scheduled_date: scheduledDate,
+                    purok: location,
+                    remarks: remarks,
+                    user_id: authId,
+                    status: initialStatus
+                })
+            });
+            if (resp.ok) {
+                const resData = await resp.json();
+                if (resData.data && resData.data.id) newEntry.id = resData.data.id;
+            }
+        }
+    } catch (e) {}
 }
 
-// Helper to sanitize HTML content
 function escapeHtml(text) {
     if (!text) return '';
     return text.toString()
@@ -593,15 +740,22 @@ function escapeHtml(text) {
 }
 
 // --------------------------------------------------------------------------
-// 7. Page Initialization
+// 8. Page Initialization
 // --------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Initialize real-time live clock
     initLiveServerClock();
 
-    // 2. Synchronize data (Backend SQLite or LocalStorage)
+    // 2. Set default live year and month in historical selectors
+    const now = new Date();
+    const yearInput = document.getElementById('filterYear');
+    const monthSelect = document.getElementById('filterMonth');
+    if (yearInput) yearInput.value = now.getFullYear();
+    if (monthSelect) monthSelect.value = String(now.getMonth());
+
+    // 3. Synchronize data (enforcing patient privacy for appointments, and community events)
     await syncWithBackend();
 
-    // 3. Render schedule table with initial filters
+    // 4. Render schedule table with live month/year filters sorted chronologically
     renderSchedule();
 });

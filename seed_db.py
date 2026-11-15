@@ -24,7 +24,7 @@ import random
 from datetime import date, timedelta, datetime
 from werkzeug.security import generate_password_hash
 from app import app
-from models import db, User, Patient, Inventory, Vital, Dispensation, Appointment, AuditLog
+from models import db, User, Patient, Inventory, Vital, Dispensation, Appointment, UpcomingEvent, AuditLog
 
 
 def seed_data(force=False):
@@ -374,17 +374,39 @@ def seed_data(force=False):
 
             # Appointments
             apt_date = date.today() + timedelta(days=random.randint(1, 14))
+            if patient.condition == "Diabetes Only":
+                apt_type = "Diabetes Follow-up"
+            elif patient.id in [9, 15, 24]:
+                apt_type = "Medicine Refill"
+            elif patient.id in [12, 29]:
+                apt_type = "Purok Assembly"
+            else:
+                apt_type = "Monthly HPN Check"
+
             apt = Appointment(
                 patient_id=patient.id,
                 user_id=patient.handler_id,
                 patient_name=patient.name,
                 title="Monthly Check-up & Maintenance Review",
-                category="Check-up",
+                type=apt_type,
+                category=apt_type,
                 scheduled_date=apt_date,
                 status="Pending",
                 notes=f"Handler ID: {patient.handler_id} - Condition: {patient.condition}"
             )
             db.session.add(apt)
+
+        # 5. Seed Baseline Upcoming Community Events
+        print("[DB Seed] Seeding upcoming community events...")
+        sample_evts = [
+            UpcomingEvent(date=date(2026, 11, 18), type="Health Campaign", details="Barangay-wide hypertension and diabetes screening and wellness assembly.", location="Poblacion 2 Plaza", status="Pending"),
+            UpcomingEvent(date=date(2026, 11, 22), type="Community Assembly", details="Monthly Senior Citizen health forum and PhilHealth Konsulta orientation.", location="Poblacion 2 Barangay Hall", status="Pending"),
+            UpcomingEvent(date=date(2026, 11, 25), type="Training Seminar", details="BHW technical refresher on digital vitals capture and cardiovascular risk stratification.", location="Nagcarlan RHU Conference Room", status="Pending"),
+            UpcomingEvent(date=date(2026, 11, 29), type="Admin Meeting", details="Quarterly primary healthcare coordination meeting with Municipal Health Officer.", location="Municipal Health Office", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 4), type="Outreach Mission", details="Mobile clinical team visiting remote sitios for medicine refills and consultations.", location="Purok 6 Covered Court", status="Pending")
+        ]
+        for evt in sample_evts:
+            db.session.add(evt)
 
         db.session.commit()
         print("[DB Seed] Successfully seeded BWC-HDMS database matching complete TCR form schema!")

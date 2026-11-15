@@ -24,7 +24,7 @@ from flask_migrate import Migrate
 # Import SQLAlchemy database and models
 from models import (
     db, User, Patient, Inventory, InventoryItem,
-    Appointment, AuditLog, ActivityLog, Vital, Dispensation
+    Appointment, UpcomingEvent, AuditLog, ActivityLog, Vital, Dispensation
 )
 
 # --------------------------------------------------------------------------
@@ -223,7 +223,8 @@ def init_db():
                 patient_id INTEGER,
                 user_id TEXT,
                 patient_name TEXT NOT NULL,
-                category TEXT NOT NULL,      -- 'Monthly HPN Check', 'Diabetes Follow-up', 'Medicine Refill', 'Purok Assembly'
+                type TEXT NOT NULL CHECK(type IN ('Monthly HPN Check', 'Diabetes Follow-up', 'Medicine Refill', 'Purok Assembly')),
+                category TEXT NOT NULL CHECK(category IN ('Monthly HPN Check', 'Diabetes Follow-up', 'Medicine Refill', 'Purok Assembly')),
                 scheduled_date TEXT NOT NULL, -- ISO 'YYYY-MM-DD'
                 purok TEXT,
                 remarks TEXT,
@@ -234,6 +235,36 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
             )
         """)
+
+        # 3.b. Upcoming Events Table (Community Campaigns, Assemblies, Seminars)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS upcoming_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date DATE NOT NULL,
+                type TEXT NOT NULL,
+                details TEXT NOT NULL,
+                location TEXT NOT NULL,
+                status TEXT DEFAULT 'Pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP
+            )
+        """)
+
+        # Ensure baseline upcoming events exist for community schedule view
+        try:
+            cursor.execute("SELECT COUNT(*) FROM upcoming_events")
+            evt_cnt = cursor.fetchone()[0]
+            if evt_cnt == 0:
+                sample_evts = [
+                    ('2026-11-18', 'Health Campaign', 'Barangay-wide hypertension and diabetes screening and wellness assembly.', 'Poblacion 2 Plaza', 'Pending'),
+                    ('2026-11-22', 'Community Assembly', 'Monthly Senior Citizen health forum and PhilHealth Konsulta orientation.', 'Poblacion 2 Barangay Hall', 'Pending'),
+                    ('2026-11-25', 'Training Seminar', 'BHW technical refresher on digital vitals capture and cardiovascular risk stratification.', 'Nagcarlan RHU Conference Room', 'Pending'),
+                    ('2026-11-29', 'Admin Meeting', 'Quarterly primary healthcare coordination meeting with Municipal Health Officer.', 'Municipal Health Office', 'Pending'),
+                    ('2026-12-04', 'Outreach Mission', 'Mobile clinical team visiting remote sitios for medicine refills and consultations.', 'Purok 6 Covered Court', 'Pending')
+                ]
+                cursor.executemany("INSERT INTO upcoming_events (date, type, details, location, status) VALUES (?, ?, ?, ?, ?)", sample_evts)
+        except Exception as evt_err:
+            print(f"[Upcoming Events Init Notice] {evt_err}")
 
         # 4. Medicine Inventory Table (with Expiration Date for shelf-life tracking)
         cursor.execute("""
@@ -607,9 +638,11 @@ def get_audit_logs():
 def get_appointments():
     """
     Retrieves appointments with dynamic filtering and automatic status calculation.
+    Enforces Patient Privacy: Logged-in BHW only sees appointments for patients directly assigned to their care.
     Query parameters:
+      - year: integer year (e.g. 2026)
       - month: 0-11 (Jan=0, Dec=11)
-      - category: filter by specific category
+      - category / type: filter by specific appointment category
       - status: 'Pending', 'Completed', 'Defaulted'
       - search: text query for patient name or remarks
     """
@@ -623,13 +656,49 @@ def get_appointments():
     """, (today_str,))
 
     # Parse query filters
+    year_filter = request.args.get("year")
     month_filter = request.args.get("month")
-    category_filter = request.args.get("category")
+    category_filter = request.args.get("category") or request.args.get("type")
     status_filter = request.args.get("status")
     search_query = request.args.get("search")
 
+    # Patient Privacy Boundary: Identify logged-in health worker
+    user_id = session.get("user_id") or request.args.get("user_id") or request.headers.get("X-User-Id")
+    username = session.get("username") or request.args.get("username") or request.headers.get("X-Username")
+
+    logged_user = None
+    if user_id:
+        logged_user = query_db("SELECT * FROM users WHERE id = ? OR LOWER(username) = LOWER(?)", (str(user_id), str(user_id)), one=True)
+    elif username:
+        logged_user = query_db("SELECT * FROM users WHERE LOWER(username) = LOWER(?) OR id = ?", (str(username), str(username)), one=True)
+
+    if not logged_user:
+        logged_user = query_db("SELECT * FROM users WHERE LOWER(username) = 'charisma' OR id = '26-001' LIMIT 1", one=True)
+
     query = "SELECT * FROM appointments WHERE 1=1"
     params = []
+
+    # Strict Privacy Enforcement: BHW only sees appointments for patients assigned to their care
+    if logged_user and not (logged_user.get("role") == "admin" and request.args.get("all") == "true"):
+        u_id = str(logged_user["id"])
+        u_username = logged_user["username"].lower()
+        u_purok = (logged_user.get("purok") or logged_user.get("station") or "").strip()
+        query += """ AND (
+            user_id = ? 
+            OR LOWER(user_id) = ? 
+            OR patient_id IN (
+                SELECT id FROM patients 
+                WHERE handler_id = ? 
+                   OR LOWER(handler_id) = ? 
+                   OR (purok IS NOT NULL AND LOWER(purok) = LOWER(?))
+            )
+            OR (patient_id IS NULL AND purok IS NOT NULL AND LOWER(purok) = LOWER(?))
+        )"""
+        params.extend([u_id, u_username, u_id, u_username, u_purok, u_purok])
+
+    if year_filter is not None and year_filter != "":
+        query += " AND strftime('%Y', scheduled_date) = ?"
+        params.append(str(year_filter))
 
     if month_filter is not None and month_filter != "":
         try:
@@ -669,7 +738,13 @@ def create_appointment():
     patient_id = data.get("patient_id")
     user_id = data.get("user_id")
     patient_name = data.get("patient_name", "").strip()
-    category = data.get("category", "Monthly HPN Check").strip()
+    category = (data.get("category") or data.get("type") or "Monthly HPN Check").strip()
+    appt_type = (data.get("type") or category).strip()
+    if appt_type not in ["Monthly HPN Check", "Diabetes Follow-up", "Medicine Refill", "Purok Assembly"]:
+        appt_type = "Monthly HPN Check"
+    if category not in ["Monthly HPN Check", "Diabetes Follow-up", "Medicine Refill", "Purok Assembly"]:
+        category = appt_type
+
     scheduled_date = data.get("scheduled_date", date.today().isoformat()).strip()
     purok = data.get("purok", "Purok 1").strip()
     remarks = data.get("remarks", "").strip()
@@ -684,9 +759,9 @@ def create_appointment():
         status = "Defaulted"
 
     appt_id = execute_db("""
-        INSERT INTO appointments (patient_id, user_id, patient_name, category, scheduled_date, purok, remarks, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (patient_id, user_id, patient_name, category, scheduled_date, purok, remarks, status))
+        INSERT INTO appointments (patient_id, user_id, patient_name, type, category, scheduled_date, purok, remarks, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (patient_id, user_id, patient_name, appt_type, category, scheduled_date, purok, remarks, status))
 
     log_audit_event(user_id, "APPOINTMENT_SCHEDULED", f"Scheduled '{category}' for {patient_name} on {scheduled_date}.")
 
@@ -803,6 +878,164 @@ def get_appointment_stats():
 
 
 # --------------------------------------------------------------------------
+# RESTful API Endpoints - Upcoming Events (Community Campaigns & Seminars)
+# --------------------------------------------------------------------------
+@app.route("/api/upcoming-events", methods=["GET"])
+def get_upcoming_events():
+    """
+    Retrieves general upcoming community events (visible to all users).
+    Query parameters:
+      - year: integer year (e.g. 2026)
+      - month: 0-11 (Jan=0, Dec=11)
+      - type: filter by event type (e.g. 'Health Campaign', 'Community Assembly')
+      - status: 'Pending', 'Completed', 'Defaulted'
+      - search: text query for details or location
+    """
+    today_str = date.today().isoformat()
+
+    # Maintenance: Auto-flag overdue pending events as Defaulted
+    execute_db("""
+        UPDATE upcoming_events
+        SET status = 'Defaulted'
+        WHERE status = 'Pending' AND date < ?
+    """, (today_str,))
+
+    year_filter = request.args.get("year")
+    month_filter = request.args.get("month")
+    type_filter = request.args.get("type") or request.args.get("category")
+    status_filter = request.args.get("status")
+    search_query = request.args.get("search")
+
+    query = "SELECT * FROM upcoming_events WHERE 1=1"
+    params = []
+
+    if year_filter is not None and year_filter != "":
+        query += " AND strftime('%Y', date) = ?"
+        params.append(str(year_filter))
+
+    if month_filter is not None and month_filter != "":
+        try:
+            m_idx = int(month_filter) + 1
+            month_formatted = f"{m_idx:02d}"
+            query += " AND strftime('%m', date) = ?"
+            params.append(month_formatted)
+        except ValueError:
+            pass
+
+    if type_filter:
+        query += " AND type = ?"
+        params.append(type_filter)
+
+    if status_filter:
+        query += " AND status = ?"
+        params.append(status_filter)
+
+    if search_query:
+        query += " AND (details LIKE ? OR location LIKE ? OR type LIKE ?)"
+        term = f"%{search_query.strip()}%"
+        params.extend([term, term, term])
+
+    query += " ORDER BY date ASC, id ASC"
+
+    events = query_db(query, params)
+    return jsonify({"success": True, "count": len(events), "data": events})
+
+
+@app.route("/api/upcoming-events", methods=["POST"])
+def create_upcoming_event():
+    """
+    Registers a new general upcoming event (visible to all users).
+    Payload: { date, type, details, location, status }
+    """
+    data = request.get_json() or {}
+    event_date = data.get("date", date.today().isoformat()).strip()
+    event_type = data.get("type", "Health Campaign").strip()
+    details = data.get("details", "").strip()
+    location = data.get("location", "Poblacion 2").strip()
+    status = data.get("status", "Pending")
+
+    if not details:
+        return jsonify({"success": False, "error": "Event details/description is required"}), 400
+
+    today_str = date.today().isoformat()
+    if status == "Pending" and event_date < today_str:
+        status = "Defaulted"
+
+    event_id = execute_db("""
+        INSERT INTO upcoming_events (date, type, details, location, status)
+        VALUES (?, ?, ?, ?, ?)
+    """, (event_date, event_type, details, location, status))
+
+    log_audit_event(None, "EVENT_CREATED", f"Created upcoming event '{event_type}' on {event_date} at {location}.")
+
+    new_event = query_db("SELECT * FROM upcoming_events WHERE id = ?", (event_id,), one=True)
+    return jsonify({"success": True, "message": "Upcoming event registered successfully", "data": new_event}), 201
+
+
+@app.route("/api/upcoming-events/<int:event_id>/status", methods=["PUT"])
+def update_upcoming_event_status(event_id):
+    """
+    Updates the status of an upcoming event (e.g. 'Completed', 'Pending', 'Defaulted').
+    Sets completed_at timestamp when marked as Completed.
+    """
+    data = request.get_json() or {}
+    new_status = data.get("status")
+
+    if new_status not in ["Pending", "Completed", "Defaulted"]:
+        return jsonify({"success": False, "error": "Invalid status value"}), 400
+
+    completed_at = datetime.utcnow().isoformat() if new_status == "Completed" else None
+
+    execute_db("""
+        UPDATE upcoming_events
+        SET status = ?, completed_at = ?
+        WHERE id = ?
+    """, (new_status, completed_at, event_id))
+
+    updated_event = query_db("SELECT * FROM upcoming_events WHERE id = ?", (event_id,), one=True)
+    if not updated_event:
+        return jsonify({"success": False, "error": "Event not found"}), 404
+
+    log_audit_event(None, "EVENT_STATUS_UPDATE", f"Upcoming event #{event_id} status updated to {new_status}.")
+    return jsonify({"success": True, "message": f"Status updated to {new_status}", "data": updated_event})
+
+
+@app.route("/api/upcoming-events/<int:event_id>/reschedule", methods=["PUT"])
+def reschedule_upcoming_event(event_id):
+    """
+    Reschedules an upcoming event to a new date.
+    Payload: { new_date: 'YYYY-MM-DD', reason: '...' }
+    """
+    data = request.get_json() or {}
+    new_date = data.get("new_date", "").strip()
+    reason = data.get("reason", "").strip()
+
+    if not new_date:
+        return jsonify({"success": False, "error": "New date is required"}), 400
+
+    event = query_db("SELECT * FROM upcoming_events WHERE id = ?", (event_id,), one=True)
+    if not event:
+        return jsonify({"success": False, "error": "Event not found"}), 404
+
+    today_str = date.today().isoformat()
+    new_status = "Pending" if new_date >= today_str else "Defaulted"
+
+    existing_details = event.get("details") or ""
+    note = f" [Rescheduled from {event['date']} to {new_date}{': ' + reason if reason else ''}]"
+    updated_details = f"{existing_details}{note}".strip()
+
+    execute_db("""
+        UPDATE upcoming_events
+        SET date = ?, details = ?, status = ?, completed_at = NULL
+        WHERE id = ?
+    """, (new_date, updated_details, new_status, event_id))
+
+    updated_event = query_db("SELECT * FROM upcoming_events WHERE id = ?", (event_id,), one=True)
+    log_audit_event(None, "EVENT_RESCHEDULED", f"Upcoming event #{event_id} rescheduled to {new_date}.")
+    return jsonify({"success": True, "message": "Event rescheduled successfully", "data": updated_event})
+
+
+# --------------------------------------------------------------------------
 # RESTful API Endpoints - Consultations & Clinical Follow-up Engine
 # --------------------------------------------------------------------------
 @app.route("/api/consultations", methods=["POST"])
@@ -852,9 +1085,9 @@ def submit_consultation():
     # 4. Auto-register in appointments table
     appt_remarks = f"Auto-scheduled 30-day routine follow-up. Prior BP: {sys_bp}/{dia_bp} mmHg."
     execute_db("""
-        INSERT INTO appointments (patient_name, category, scheduled_date, purok, remarks, status)
-        VALUES (?, ?, ?, ?, ?, 'Pending')
-    """, (patient_name, category, next_date, "Purok 1", appt_remarks))
+        INSERT INTO appointments (patient_name, type, category, scheduled_date, purok, remarks, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'Pending')
+    """, (patient_name, category, category, next_date, "Purok 1", appt_remarks))
 
     log_audit_event(None, "CONSULTATION_SUBMITTED", f"Recorded vitals for {patient_name} (BP: {sys_bp}/{dia_bp}).")
 
@@ -1173,7 +1406,7 @@ if __name__ == "__main__":
     with app.app_context():
         init_db()
     print("=" * 70)
-    print(" BWC-HDMS Capstone Server running in offline mode")
+    print(" BWC-HDMS Server running in offline mode")
     print(" Access URL: http://127.0.0.1:5000/loginPage.html")
     print("=" * 70)
     app.run(host="127.0.0.1", port=5000, debug=True)

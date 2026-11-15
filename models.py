@@ -229,6 +229,7 @@ class Appointment(db.Model):
     patient_name = db.Column(db.String(150), nullable=True)
     title = db.Column(db.String(100), nullable=True)
     category = db.Column(db.String(50), default='Monthly HPN Check')
+    type = db.Column(db.String(50), default='Monthly HPN Check')
     scheduled_date = db.Column(db.Date, nullable=False)
     purok = db.Column(db.String(100), nullable=True)
     remarks = db.Column(db.Text, nullable=True)
@@ -247,7 +248,8 @@ class Appointment(db.Model):
             'patient_id': self.patient_id,
             'user_id': self.user_id,
             'patient_name': self.patient_name,
-            'category': self.category,
+            'category': self.category or self.type,
+            'type': self.type or self.category,
             'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
             'purok': self.purok,
             'remarks': self.remarks or self.notes,
@@ -327,3 +329,36 @@ class Dispensation(db.Model):
     # Relationships
     patient = db.relationship('Patient', back_populates='dispensations')
     inventory_item = db.relationship('Inventory', back_populates='dispensations')
+
+
+# ==============================================================================
+# 8. Upcoming Community Events Model
+# ==============================================================================
+class UpcomingEvent(db.Model):
+    __tablename__ = 'upcoming_events'
+
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False)
+    type = db.Column(db.String(50), nullable=False)  # Health Campaign, Community Assembly, Admin Meeting, Training Seminar, Outreach Mission
+    details = db.Column(db.Text, nullable=False)
+    location = db.Column(db.String(150), nullable=False)
+    status = db.Column(db.String(50), default='Pending')  # 'Pending', 'Completed', 'Defaulted'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'date': self.date.isoformat() if self.date else None,
+            'scheduled_date': self.date.isoformat() if self.date else None,
+            'type': self.type,
+            'category': self.type,
+            'details': self.details,
+            'remarks': self.details,
+            'location': self.location,
+            'purok': self.location,
+            'status': self.status,
+            'is_event': True,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None
+        }

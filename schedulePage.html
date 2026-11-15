@@ -94,9 +94,24 @@
                 </button>
             </div>
 
-            <!-- Filter Controls (Month, Category, Status) -->
-            <div class="card-custom mb-4" style="padding: 1rem;">
-                <div class="grid-3-col">
+            <!-- Filter Controls (Year, Month, Category/Type, Status) -->
+            <div class="card-custom mb-4" style="padding: 1rem 1.25rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem;">
+                    <!-- 1. Historical Year Counter / Selector -->
+                    <div class="form-group mb-0">
+                        <label class="form-label" for="filterYear">Year</label>
+                        <div class="input-group d-flex align-center gap-1">
+                            <button class="btn btn-outline-secondary btn-sm px-2.5 py-1.5" type="button" onclick="adjustYear(-1)" title="Previous Year">
+                                <i class="bi bi-dash-lg"></i>
+                            </button>
+                            <input type="number" class="form-control text-center fw-bold" id="filterYear" value="2026" min="2020" max="2099" onchange="renderSchedule()">
+                            <button class="btn btn-outline-secondary btn-sm px-2.5 py-1.5" type="button" onclick="adjustYear(1)" title="Next Year">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Historical Month Dropdown Selector -->
                     <div class="form-group mb-0">
                         <label class="form-label" for="filterMonth">Month</label>
                         <select class="form-select" id="filterMonth" onchange="renderSchedule()">
@@ -115,16 +130,29 @@
                             <option value="11">December</option>
                         </select>
                     </div>
+
+                    <!-- 3. Enumerated Type Filter Dropdown -->
                     <div class="form-group mb-0">
-                        <label class="form-label" for="filterCategory">Category / Type</label>
+                        <label class="form-label" for="filterCategory">Event / Appointment Type</label>
                         <select class="form-select" id="filterCategory" onchange="renderSchedule()">
                             <option value="">All Types</option>
-                            <option value="Monthly HPN Check">Monthly HPN Check</option>
-                            <option value="Diabetes Follow-up">Diabetes Follow-up</option>
-                            <option value="Medicine Refill">Medicine Refill</option>
-                            <option value="Purok Assembly">Purok Assembly</option>
+                            <optgroup label="Patient Appointments">
+                                <option value="Monthly HPN Check">Monthly HPN Check</option>
+                                <option value="Diabetes Follow-up">Diabetes Follow-up</option>
+                                <option value="Medicine Refill">Medicine Refill</option>
+                                <option value="Purok Assembly">Purok Assembly</option>
+                            </optgroup>
+                            <optgroup label="Community Upcoming Events">
+                                <option value="Health Campaign">Health Campaign</option>
+                                <option value="Community Assembly">Community Assembly</option>
+                                <option value="Admin Meeting">Admin Meeting</option>
+                                <option value="Training Seminar">Training Seminar</option>
+                                <option value="Outreach Mission">Outreach Mission</option>
+                            </optgroup>
                         </select>
                     </div>
+
+                    <!-- 4. Status Filter -->
                     <div class="form-group mb-0">
                         <label class="form-label" for="filterStatus">Status</label>
                         <select class="form-select" id="filterStatus" onchange="renderSchedule()">
@@ -166,70 +194,115 @@
     </div>
 
     <!-- =========================================================================
-         New Schedule Entry Modal
+         New Schedule Entry & Upcoming Event Modal (Add Medicine Pattern)
          ========================================================================= -->
-    <div class="modal-backdrop-custom hidden" id="scheduleModal">
-        <div class="modal-dialog-box modal-dialog-md">
-            <div class="modal-header-custom">
+    <div class="modal-overlay hidden" id="scheduleModal" role="dialog" aria-modal="true">
+        <div class="modal-dialog-box modal-dialog-lg" style="max-width: 680px;">
+            <div class="modal-header-custom" style="border-bottom: 1px solid var(--border-color);">
                 <div>
                     <h5 class="modal-title-custom">
-                        <i class="bi bi-calendar-plus-fill text-primary me-2"></i>New Schedule Entry
+                        <i class="bi bi-calendar-plus-fill text-primary me-2"></i>New Schedule Entry & Event
                     </h5>
-                    <p class="text-muted mb-0" style="font-size: 0.8rem;">Schedule client follow-ups, medicine refills, or community assemblies</p>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">Schedule patient consultations, follow-ups, health campaigns, or community events</p>
                 </div>
                 <button type="button" class="modal-close-btn" onclick="closeScheduleModal()">&times;</button>
             </div>
             <div class="modal-body-custom">
                 <form id="newScheduleForm" onsubmit="saveScheduleEntry(event)">
-                    <div class="form-group">
-                        <label class="form-label" for="schedCategory">Schedule Category <span class="text-danger">*</span></label>
-                        <select class="form-select" id="schedCategory" required>
-                            <option value="Monthly HPN Check">Monthly HPN Check</option>
-                            <option value="Diabetes Follow-up">Diabetes Follow-up</option>
-                            <option value="Medicine Refill">Medicine Refill</option>
-                            <option value="Purok Assembly">Purok Assembly</option>
-                        </select>
+                    
+                    <!-- 1. Entry Classification & Schedule Type -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-tags text-primary me-2"></i>
+                        <span>Entry Classification & Schedule Type</span>
+                    </div>
+                    <p class="section-help-text mb-3">Choose whether to schedule an individual patient consultation or a barangay-wide community event.</p>
+
+                    <div class="grid-2-col mb-3">
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="schedCategory">Entry Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="schedCategory" required onchange="handleSchedTypeChange()">
+                                <optgroup label="Patient Appointments">
+                                    <option value="Monthly HPN Check" selected>Monthly HPN Check</option>
+                                    <option value="Diabetes Follow-up">Diabetes Follow-up</option>
+                                    <option value="Medicine Refill">Medicine Refill</option>
+                                    <option value="Purok Assembly">Purok Assembly</option>
+                                </optgroup>
+                                <optgroup label="Community Upcoming Events">
+                                    <option value="Health Campaign">Health Campaign</option>
+                                    <option value="Community Assembly">Community Assembly</option>
+                                    <option value="Admin Meeting">Admin Meeting</option>
+                                    <option value="Training Seminar">Training Seminar</option>
+                                    <option value="Outreach Mission">Outreach Mission</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label" for="schedPatientName" id="lblSchedTarget">Target Client / Beneficiary <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="schedPatientName" placeholder="e.g. Juan Dela Cruz or Community Beneficiaries" required list="patientSuggestions">
+                            <datalist id="patientSuggestions">
+                                <option value="Barangay Residents - Purok 1">
+                                <option value="Barangay Residents - Purok 2">
+                                <option value="Barangay Residents - Purok 3">
+                                <option value="Hypertension & Diabetes Patients">
+                                <option value="Senior Citizens Circle">
+                            </datalist>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label" for="schedPatientName">Target Client or Assembly Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="schedPatientName" placeholder="e.g. Juan Mercado Dela Cruz or Purok 2 Residents" required list="patientSuggestions">
-                        <datalist id="patientSuggestions">
-                            <option value="Barangay Residents - Purok 1">
-                            <option value="Barangay Residents - Purok 2">
-                            <option value="Barangay Residents - Purok 3">
-                        </datalist>
-                    </div>
+                    <hr class="form-field-divider">
 
-                    <div class="grid-2-col mb-2">
+                    <!-- 2. Schedule Date & Venue -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-calendar-event text-primary me-2"></i>
+                        <span>Date & Location Logistics</span>
+                    </div>
+                    <p class="section-help-text mb-3">Set scheduled date and designate barangay health station, sitio, or municipal facility.</p>
+
+                    <div class="grid-2-col mb-3">
                         <div class="form-group mb-0">
                             <label class="form-label" for="schedDate">Scheduled Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" id="schedDate" required>
                         </div>
                         <div class="form-group mb-0">
-                            <label class="form-label" for="schedPurok">Purok / Location <span class="text-danger">*</span></label>
-                            <select class="form-select" id="schedPurok" required>
-                                <option value="Purok 1">Purok 1</option>
-                                <option value="Purok 2">Purok 2</option>
-                                <option value="Purok 3">Purok 3</option>
-                                <option value="Purok 4">Purok 4</option>
-                                <option value="Purok 5">Purok 5</option>
-                                <option value="Purok 6">Purok 6</option>
-                                <option value="Purok 7">Purok 7</option>
-                                <option value="Barangay Health Station">Barangay Health Station</option>
-                            </select>
+                            <label class="form-label" for="schedPurok">Venue / Location <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="schedPurok" placeholder="e.g. Purok 1 Health Station, Municipal Gym, Poblacion 2 Office" required list="locationSuggestions">
+                            <datalist id="locationSuggestions">
+                                <option value="Purok 1">
+                                <option value="Purok 2">
+                                <option value="Purok 3">
+                                <option value="Purok 4">
+                                <option value="Purok 5">
+                                <option value="Purok 6">
+                                <option value="Purok 7">
+                                <option value="Barangay Health Station">
+                                <option value="Poblacion 2 Barangay Hall">
+                                <option value="Poblacion 2 Plaza">
+                                <option value="Municipal Gym">
+                                <option value="Municipal Health Office">
+                                <option value="Nagcarlan RHU Conference Room">
+                            </datalist>
                         </div>
                     </div>
 
+                    <hr class="form-field-divider">
+
+                    <!-- 3. Event Details & Remarks -->
+                    <div class="section-badge-title mb-2">
+                        <i class="bi bi-card-text text-primary me-2"></i>
+                        <span>Event Description & Clinical Remarks</span>
+                    </div>
+                    <p class="section-help-text mb-3">Provide clinical instructions, medicine refill requirements, or community event agenda.</p>
+
                     <div class="form-group mb-4">
-                        <label class="form-label" for="schedRemarks">Details / Instructions / Remarks</label>
-                        <textarea class="form-control" id="schedRemarks" rows="3" placeholder="Enter clinical instructions, medicine to dispense, or assembly agenda..."></textarea>
+                        <label class="form-label" for="schedRemarks">Details / Instructions / Remarks <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="schedRemarks" rows="3" placeholder="Enter clinical instructions, medicine to dispense, or community event agenda..." required></textarea>
                     </div>
 
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary py-2" style="flex: 1;" onclick="closeScheduleModal()">Cancel</button>
-                        <button type="submit" class="btn btn-primary py-2" style="flex: 2;">
-                            <i class="bi bi-save me-1"></i> Save to Schedule
+                    <!-- Modal Action Footer Buttons -->
+                    <div class="d-flex gap-2 pt-3" style="border-top: 1px solid var(--border-color);">
+                        <button type="button" class="btn btn-outline-secondary py-2.5 fw-semibold" style="flex: 1;" onclick="closeScheduleModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary py-2.5 fw-semibold" style="flex: 2;">
+                            <i class="bi bi-check-lg me-1"></i> Save to Schedule
                         </button>
                     </div>
                 </form>
@@ -238,14 +311,50 @@
     </div>
 
     <!-- =========================================================================
+         Event Details Expandable Message Bubble Modal
+         ========================================================================= -->
+    <div class="modal-overlay hidden" id="eventBubbleModal" role="dialog" aria-modal="true">
+        <div class="modal-dialog-box modal-dialog-md" style="max-width: 520px; border-radius: 12px; overflow: hidden;">
+            <div class="modal-header-custom p-3.5 px-4" style="border-bottom: 1px solid var(--border-color); background: var(--bg-surface-secondary, #f8fafc);">
+                <div class="d-flex align-center gap-3">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(13, 110, 253, 0.12); color: var(--bs-primary, #0d6efd); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="bi bi-chat-quote-fill" style="font-size: 1.2rem;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title-custom mb-1" id="bubbleEventType" style="font-size: 1.05rem; font-weight: 700;">Event Details</h5>
+                        <span class="text-muted" id="bubbleEventDate" style="font-size: 0.8rem;">--</span>
+                    </div>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeEventBubble()" title="Close">&times;</button>
+            </div>
+            <div class="modal-body-custom px-4 py-4" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <div>
+                    <div class="section-badge-title mb-2.5">
+                        <i class="bi bi-info-circle text-primary me-2"></i>
+                        <span>Full Description</span>
+                    </div>
+                    <div class="p-3.5" style="background: var(--bg-surface-secondary, #f8fafc); border-radius: 8px; border: 1px solid var(--border-color); line-height: 1.7; font-size: 0.92rem; color: var(--text-color, #1e293b); min-height: 75px;" id="bubbleEventDetails">
+                        --
+                    </div>
+                </div>
+                <div class="d-flex align-center gap-2.5 text-muted p-3" style="font-size: 0.875rem; background: var(--bg-surface-secondary, #f8fafc); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <i class="bi bi-geo-alt-fill text-primary" style="font-size: 1.05rem;"></i>
+                    <span class="fw-semibold text-heading">Location / Venue:</span>
+                    <span id="bubbleEventLocation" class="text-secondary">--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
          Reschedule Modal
          ========================================================================= -->
-    <div class="modal-backdrop-custom hidden" id="rescheduleModal">
+    <div class="modal-overlay hidden" id="rescheduleModal" role="dialog" aria-modal="true">
         <div class="modal-dialog-box modal-dialog-sm">
-            <div class="modal-header-custom">
+            <div class="modal-header-custom" style="border-bottom: 1px solid var(--border-color);">
                 <div>
                     <h5 class="modal-title-custom">
-                        <i class="bi bi-calendar-event text-primary me-2"></i>Reschedule Appointment
+                        <i class="bi bi-calendar-event text-primary me-2"></i>Reschedule Entry
                     </h5>
                     <p class="text-muted mb-0" style="font-size: 0.8rem;" id="reschedPatientSubtitle">Update scheduled date</p>
                 </div>
@@ -254,8 +363,9 @@
             <div class="modal-body-custom">
                 <form id="rescheduleForm" onsubmit="confirmReschedule(event)">
                     <input type="hidden" id="reschedApptId">
+                    <input type="hidden" id="reschedIsEvent">
                     
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label class="form-label" for="reschedNewDate">New Scheduled Date <span class="text-danger">*</span></label>
                         <input type="date" class="form-control" id="reschedNewDate" required>
                     </div>
@@ -265,9 +375,9 @@
                         <textarea class="form-control" id="reschedReason" rows="2" placeholder="e.g. Patient requested postponement; rescheduled due to weather..."></textarea>
                     </div>
 
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary py-2" style="flex: 1;" onclick="closeRescheduleModal()">Cancel</button>
-                        <button type="submit" class="btn btn-primary py-2" style="flex: 2;">
+                    <div class="d-flex gap-2 pt-2" style="border-top: 1px solid var(--border-color);">
+                        <button type="button" class="btn btn-outline-secondary py-2 fw-semibold" style="flex: 1;" onclick="closeRescheduleModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary py-2 fw-semibold" style="flex: 2;">
                             <i class="bi bi-check-lg me-1"></i> Confirm Reschedule
                         </button>
                     </div>
