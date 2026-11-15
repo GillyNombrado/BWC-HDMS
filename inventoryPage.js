@@ -31,6 +31,7 @@ async function loadInventory() {
                 inventoryData = result.data.map(item => ({
                     id: item.id,
                     name: item.item_name,
+                    dosage: item.dosage || 'N/A',
                     category: item.category || 'Antihypertensive',
                     batchNo: item.batch_no || 'N/A',
                     stock: parseInt(item.current_stock || 0, 10),
@@ -115,6 +116,7 @@ function renderInventoryTable() {
     const filteredData = inventoryData.filter(item => {
         const matchesSearch = 
             (item.name && item.name.toLowerCase().includes(currentSearchQuery)) ||
+            (item.dosage && item.dosage.toLowerCase().includes(currentSearchQuery)) ||
             (item.category && item.category.toLowerCase().includes(currentSearchQuery)) ||
             (item.batchNo && item.batchNo.toLowerCase().includes(currentSearchQuery));
         
@@ -127,7 +129,7 @@ function renderInventoryTable() {
         const isSearching = currentSearchQuery !== '' || currentCategoryFilter !== '';
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center py-5 text-muted">
+                <td colspan="7" class="text-center py-5 text-muted">
                     <i class="bi bi-capsule d-block mb-2" style="font-size: 2rem; opacity: 0.5;"></i>
                     <span class="fw-semibold" style="font-size: 0.95rem;">${isSearching ? 'No matching medicine records found.' : 'No medicine inventory records found or unseeded.'}</span>
                     <p class="text-muted mb-0" style="font-size: 0.8rem; margin-top: 0.25rem;">${isSearching ? 'Try adjusting your search query or category filter.' : 'Click "Add Medicine Supply" above to record initial stocks or log an RHU delivery.'}</p>
@@ -158,6 +160,7 @@ function renderInventoryTable() {
 
         row.innerHTML = `
             <td class="ps-4 fw-semibold">${escapeHtml(item.name)}</td>
+            <td>${escapeHtml(item.dosage || 'N/A')}</td>
             <td>${escapeHtml(item.category || 'General')}</td>
             <td class="text-muted" style="font-family: monospace;">${escapeHtml(item.batchNo || 'N/A')}</td>
             <td><span class="${stockClass}">${item.stock} ${escapeHtml(item.unit || 'tabs')}</span></td>
