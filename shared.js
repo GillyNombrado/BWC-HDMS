@@ -41,9 +41,34 @@ function initTheme() {
 }
 
 // --------------------------------------------------------------------------
-// 2. User Profile Dropdown
+// 2. User Profile Display & Synchronization
 // --------------------------------------------------------------------------
+function initUserProfile() {
+    const fullName = sessionStorage.getItem('bwc_full_name') || sessionStorage.getItem('bwc_user') || 'Charisma Astronomo';
+    let station = sessionStorage.getItem('bwc_station') || sessionStorage.getItem('bwc_purok') || 'Purok 1';
+
+    // Keep station display clean: show only Purok
+    if (station && station.includes(',')) {
+        station = station.split(',')[0].trim();
+    }
+
+    // Update top navbar meta elements across all pages
+    document.querySelectorAll('.user-meta-name').forEach(el => {
+        el.textContent = fullName;
+    });
+
+    document.querySelectorAll('.user-meta-sub').forEach(el => {
+        el.textContent = station;
+    });
+
+    const activeStationEl = document.getElementById('dashActiveStation');
+    if (activeStationEl) {
+        activeStationEl.textContent = station;
+    }
+}
+
 function initUserDropdown() {
+    initUserProfile();
     const toggle = document.getElementById('userDropdownToggle');
     const menu = document.getElementById('userDropdownMenu');
     if (toggle && menu) {
@@ -176,5 +201,6 @@ function resetLocalDatabase() {
 // --------------------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    initUserProfile();
     initUserDropdown();
 });

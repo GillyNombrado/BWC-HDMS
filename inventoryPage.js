@@ -192,7 +192,7 @@ async function requestRestock() {
         const response = await fetch(`${BACKEND_INVENTORY_URL}/restock-request`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requested_by: 'Midwife Maria' })
+            body: JSON.stringify({ requested_by: sessionStorage.getItem('bwc_full_name') || 'BHW Station Officer' })
         });
 
         if (response.ok) {

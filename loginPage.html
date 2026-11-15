@@ -43,22 +43,26 @@
             <div class="form-group">
                 <label class="form-label" for="loginStation">Select Health Station / Purok</label>
                 <select class="form-select" id="loginStation" required>
-                    <option value="BHS Purok 3 Station">BHS Purok 3 Station</option>
-                    <option value="BHS Purok 1 Station">BHS Purok 1 Station</option>
-                    <option value="BHS Purok 2 Station">BHS Purok 2 Station</option>
-                    <option value="BHS Purok 4 Station">BHS Purok 4 Station</option>
-                    <option value="Main Barangay Health Center">Main Barangay Health Center</option>
+                    <option value="" disabled selected>Loading health stations...</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="loginUsername">Staff ID / Midwife Name</label>
-                <input type="text" class="form-control" id="loginUsername" value="Midwife Maria" required>
+                <label class="form-label" for="loginUsername">Barangay Health Worker (BHW) Username / Staff ID</label>
+                <input type="text" class="form-control" id="loginUsername" placeholder="Enter BHW Username or Staff ID (e.g. 26-001 or charisma)" required autocomplete="username">
             </div>
 
-            <div class="form-group mb-4">
+            <div class="form-group mb-3">
                 <label class="form-label" for="loginPassword">Station Security PIN / Password</label>
-                <input type="password" class="form-control" id="loginPassword" value="123456" placeholder="Enter station password" required>
+                <input type="password" class="form-control" id="loginPassword" value="password123" placeholder="Enter station password" required autocomplete="current-password">
+            </div>
+
+            <!-- Error Banner Container for Wrong Input -->
+            <div id="loginErrorMessage" class="hidden mb-3" style="padding: 0.75rem 0.9rem; border-radius: 8px; background-color: rgba(220, 38, 38, 0.1); border: 1px solid var(--danger); color: var(--danger); font-size: 0.825rem; font-weight: 500;">
+                <div class="d-flex align-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill" style="flex-shrink: 0;"></i>
+                    <span id="loginErrorText">Invalid Username/Password. Try again.</span>
+                </div>
             </div>
 
             <!-- Data Privacy Agreement (RA 10173) -->

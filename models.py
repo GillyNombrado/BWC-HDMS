@@ -10,17 +10,45 @@ db = SQLAlchemy()
 class User(db.Model):
     __tablename__ = 'users'
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(20), primary_key=True)  # Format: YY-NNN (e.g. '26-001')
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(50), nullable=False, default='bhw') # 'bhw', 'midwife', 'admin'
     full_name = db.Column(db.String(120), nullable=True)
+    purok = db.Column(db.String(50), nullable=True)
+    address = db.Column(db.String(200), nullable=True)
     station = db.Column(db.String(120), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Strict Foreign Key Relationships
     appointments = db.relationship('Appointment', back_populates='user', lazy=True)
     audit_logs = db.relationship('AuditLog', back_populates='user', lazy=True)
+
+    @staticmethod
+    def generate_next_id(year=None):
+        """
+        Generates a sequential user ID with format YY-NNN (e.g., '26-001').
+        YY: 2-digit year of creation (e.g. '26' for 2026).
+        NNN: 3-digit zero-padded sequential integer starting at 001.
+        """
+        yy = (year if year is not None else datetime.utcnow().year) % 100
+        prefix = f"{yy:02d}-"
+        # Query highest existing ID for the given prefix
+        try:
+            latest = User.query.filter(User.id.like(f"{prefix}%")).order_by(User.id.desc()).first()
+            if latest and latest.id:
+                parts = str(latest.id).split("-")
+                seq = int(parts[1]) + 1 if len(parts) > 1 else 1
+            else:
+                seq = 1
+        except Exception:
+            seq = 1
+        return f"{prefix}{seq:03d}"
+
+    def __init__(self, **kwargs):
+        if 'id' not in kwargs or not kwargs['id']:
+            kwargs['id'] = User.generate_next_id()
+        super(User, self).__init__(**kwargs)
 
     def set_password(self, password):
         """Hashes and stores the user's password securely."""
@@ -37,7 +65,9 @@ class User(db.Model):
             'username': self.username,
             'role': self.role,
             'full_name': self.full_name,
-            'station': self.station,
+            'purok': self.purok or self.station,
+            'address': self.address,
+            'station': self.purok or self.station,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
@@ -147,7 +177,7 @@ class Appointment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     # Strict Foreign Key Constraints
     patient_id = db.Column(db.Integer, db.ForeignKey('patients.id', ondelete='CASCADE'), nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    user_id = db.Column(db.String(20), db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     
     patient_name = db.Column(db.String(150), nullable=True)
     title = db.Column(db.String(100), nullable=True)
@@ -187,7 +217,7 @@ class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    user_id = db.Column(db.String(20), db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     action = db.Column(db.String(255), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     details = db.Column(db.Text, nullable=True)

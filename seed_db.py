@@ -1,7 +1,7 @@
 from app import app
 from models import db, User, Patient, Inventory, Vital, Dispensation, Appointment, AuditLog
 from werkzeug.security import generate_password_hash
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import random
 
 def seed_data():
@@ -14,26 +14,32 @@ def seed_data():
             print("Database already contains data. Skipping seed.")
             return
 
-        # 7 BHWs setup with full names, usernames, and purok addresses
+        # 7 BHWs setup with full names, usernames, and separated purok / address
         bhw_data = [
-            {"username": "charisma", "full_name": "Charisma Astronomo", "purok": "Purok 1, Poblacion 2, Nagcarlan, Laguna", "count": 5},
-            {"username": "marisa", "full_name": "Marisa Pullan", "purok": "Purok 2, Poblacion 2, Nagcarlan, Laguna", "count": 4},
-            {"username": "thess", "full_name": "Marites Torres", "purok": "Purok 3, Poblacion 2, Nagcarlan, Laguna", "count": 4},
-            {"username": "flora", "full_name": "Flora Angeles", "purok": "Purok 4, Poblacion 2, Nagcarlan, Laguna", "count": 5},
-            {"username": "grace", "full_name": "Grace Yretarino", "purok": "Purok 5, Poblacion 2, Nagcarlan, Laguna", "count": 4},
-            {"username": "michelle", "full_name": "Michelle Oboza", "purok": "Purok 6, Poblacion 2, Nagcarlan, Laguna", "count": 4},
-            {"username": "violy", "full_name": "Violeta Esmijarda", "purok": "Purok 7, Poblacion 2, Nagcarlan, Laguna", "count": 4}
+            {"username": "charisma", "full_name": "Charisma Astronomo", "purok": "Purok 1", "address": "Poblacion 2, Nagcarlan, Laguna", "count": 5},
+            {"username": "marisa", "full_name": "Marisa Pullan", "purok": "Purok 2", "address": "Poblacion 2, Nagcarlan, Laguna", "count": 4},
+            {"username": "thess", "full_name": "Marites Torres", "purok": "Purok 3", "address": "Poblacion 2, Nagcarlan, Laguna", "count": 4},
+            {"username": "flora", "full_name": "Flora Angeles", "purok": "Purok 4", "address": "Poblacion 2, Nagcarlan, Laguna", "count": 5},
+            {"username": "grace", "full_name": "Grace Yretarino", "purok": "Purok 5", "address": "Poblacion 2, Nagcarlan, Laguna", "count": 4},
+            {"username": "michelle", "full_name": "Michelle Oboza", "purok": "Purok 6", "address": "Poblacion 2, Nagcarlan, Laguna", "count": 4},
+            {"username": "violy", "full_name": "Violeta Esmijarda", "purok": "Purok 7", "address": "Poblacion 2, Nagcarlan, Laguna", "count": 4}
         ]
 
-        bhw_address_map = {bhw["username"]: bhw["purok"] for bhw in bhw_data}
+        bhw_purok_map = {bhw["username"]: bhw["purok"] for bhw in bhw_data}
+        bhw_address_map = {bhw["username"]: bhw["address"] for bhw in bhw_data}
 
         created_users = {}
-        for bhw in bhw_data:
+        yy = datetime.utcnow().year % 100
+        for idx, bhw in enumerate(bhw_data, start=1):
+            user_id = f"{yy:02d}-{idx:03d}"
             user = User(
+                id=user_id,
                 username=bhw["username"],
                 password_hash=generate_password_hash("password123"),
                 role="bhw",
                 full_name=bhw["full_name"],
+                purok=bhw["purok"],
+                address=bhw["address"],
                 station=bhw["purok"]
             )
             db.session.add(user)
@@ -43,7 +49,7 @@ def seed_data():
             # Add initial audit log for account setup
             log = AuditLog(
                 user_id=user.id,
-                action=f"Registered account for {bhw['full_name']} ({bhw['purok']})"
+                action=f"Registered account for {bhw['full_name']} ({bhw['purok']}) [ID: {user.id}]"
             )
             db.session.add(log)
         
@@ -99,6 +105,7 @@ def seed_data():
         inserted_patients = []
         for p in sample_data_pool:
             fname, lname, contact, bhw_username, med_status = p[0], p[1], p[2], p[3], p[4]
+            patient_purok = bhw_purok_map.get(bhw_username, "Purok 1")
             patient_address = bhw_address_map.get(bhw_username, "Poblacion 2, Nagcarlan, Laguna")
             
             patient = Patient(
@@ -107,6 +114,7 @@ def seed_data():
                 name=f"{fname} {lname}",
                 gender="Female" if fname in ["Ana", "Elena", "Gloria", "Maria", "Clara", "Corazon", "Luz", "Imelda", "Rosa", "Rosita", "Teresa", "Carmen", "Lilibeth", "Marilou", "Jocelyn"] else "Male",
                 contact_number=contact,
+                purok=patient_purok,
                 address=patient_address,
                 assigned_bhw=bhw_username,
                 medical_status=med_status,

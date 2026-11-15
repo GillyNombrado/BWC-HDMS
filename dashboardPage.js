@@ -15,6 +15,9 @@ const STORAGE_KEY_APPOINTMENTS = 'bwc_appointments_db';
 const BACKEND_STATS_URL = 'http://127.0.0.1:5000/api/appointments/stats';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 0. Synchronize logged-in user profile header
+    syncDashboardUserHeader();
+
     // 1. Show Privacy Terms modal on initial visit if not yet acknowledged in this session
     initPrivacyGate();
 
@@ -27,6 +30,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. Render critical inventory alerts dynamically
     updateCriticalInventoryAlerts();
 });
+
+function syncDashboardUserHeader() {
+    if (typeof initUserProfile === 'function') {
+        initUserProfile();
+    }
+    const fullName = sessionStorage.getItem('bwc_full_name') || sessionStorage.getItem('bwc_user') || 'Charisma Astronomo';
+    let station = sessionStorage.getItem('bwc_station') || sessionStorage.getItem('bwc_purok') || 'Purok 1';
+    if (station && station.includes(',')) {
+        station = station.split(',')[0].trim();
+    }
+    
+    const profileName = document.getElementById('userProfileName');
+    if (profileName) profileName.textContent = fullName;
+    const profileStation = document.getElementById('userProfileStation');
+    if (profileStation) profileStation.textContent = station;
+    const activeStation = document.getElementById('dashActiveStation');
+    if (activeStation) activeStation.textContent = station;
+}
 
 // --------------------------------------------------------------------------
 // 1. Dynamic Schedule & Registry Metrics Calculation

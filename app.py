@@ -93,114 +93,239 @@ def log_audit_event(user_id, action, details=None):
 # --------------------------------------------------------------------------
 def init_db():
     """Initializes tables cleanly without injecting mock or seed data."""
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
+    with app.app_context():
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
 
-    # 1. Target Client Registry (Patients) Table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS patients (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            first_name TEXT,
-            middle_name TEXT,
-            last_name TEXT,
-            dob TEXT,
-            age INTEGER,
-            sex TEXT,
-            contact TEXT,
-            purok TEXT,
-            address TEXT,
-            condition TEXT,
-            diagnosis_date TEXT,
-            ph_id TEXT,
-            last_visit TEXT,
-            risk_level TEXT DEFAULT 'Moderate',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+        # 1. Target Client Registry (Patients) Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS patients (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                first_name TEXT,
+                middle_name TEXT,
+                last_name TEXT,
+                dob TEXT,
+                age INTEGER,
+                sex TEXT,
+                contact TEXT,
+                purok TEXT,
+                address TEXT,
+                condition TEXT,
+                diagnosis_date TEXT,
+                ph_id TEXT,
+                last_visit TEXT,
+                risk_level TEXT DEFAULT 'Moderate',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
-    # 2. Consultations & Vitals Ledger Table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS consultations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_name TEXT NOT NULL,
-            sys_bp INTEGER,
-            dia_bp INTEGER,
-            glucose INTEGER,
-            weight REAL,
-            height REAL,
-            bmi_result TEXT,
-            risk_level TEXT,
-            remarks TEXT,
-            consult_date TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+        # 2. Consultations & Vitals Ledger Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS consultations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_name TEXT NOT NULL,
+                sys_bp INTEGER,
+                dia_bp INTEGER,
+                glucose INTEGER,
+                weight REAL,
+                height REAL,
+                bmi_result TEXT,
+                risk_level TEXT,
+                remarks TEXT,
+                consult_date TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
-    # 3. Monthly Appointments & Schedule Table (with strict Foreign Keys)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS appointments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER,
-            user_id INTEGER,
-            patient_name TEXT NOT NULL,
-            category TEXT NOT NULL,      -- 'Monthly HPN Check', 'Diabetes Follow-up', 'Medicine Refill', 'Purok Assembly'
-            scheduled_date TEXT NOT NULL, -- ISO 'YYYY-MM-DD'
-            purok TEXT,
-            remarks TEXT,
-            status TEXT DEFAULT 'Pending', -- 'Pending', 'Completed', 'Defaulted'
-            completed_date TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-        )
-    """)
+        # 3. Monthly Appointments & Schedule Table (with strict Foreign Keys)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS appointments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER,
+                user_id TEXT,
+                patient_name TEXT NOT NULL,
+                category TEXT NOT NULL,      -- 'Monthly HPN Check', 'Diabetes Follow-up', 'Medicine Refill', 'Purok Assembly'
+                scheduled_date TEXT NOT NULL, -- ISO 'YYYY-MM-DD'
+                purok TEXT,
+                remarks TEXT,
+                status TEXT DEFAULT 'Pending', -- 'Pending', 'Completed', 'Defaulted'
+                completed_date TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+        """)
 
-    # 4. Medicine Inventory Table (with Expiration Date for shelf-life tracking)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS inventory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_name TEXT NOT NULL,
-            category TEXT DEFAULT 'Antihypertensive',
-            batch_no TEXT,
-            dosage TEXT,
-            current_stock INTEGER DEFAULT 0,
-            unit TEXT DEFAULT 'tabs',
-            reorder_level INTEGER DEFAULT 20,
-            status TEXT DEFAULT 'Adequate',
-            expiration_date DATE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+        # 4. Medicine Inventory Table (with Expiration Date for shelf-life tracking)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS inventory (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_name TEXT NOT NULL,
+                category TEXT DEFAULT 'Antihypertensive',
+                batch_no TEXT,
+                dosage TEXT,
+                current_stock INTEGER DEFAULT 0,
+                unit TEXT DEFAULT 'tabs',
+                reorder_level INTEGER DEFAULT 20,
+                status TEXT DEFAULT 'Adequate',
+                expiration_date DATE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
-    # 5. User Authentication Table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT DEFAULT 'bhw',     -- 'bhw', 'midwife', 'admin'
-            full_name TEXT,
-            station TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+        # 5. User Authentication Table (String Primary Key YY-NNN format e.g. '26-001')
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT DEFAULT 'bhw',     -- 'bhw', 'admin'
+                full_name TEXT,
+                purok TEXT,
+                address TEXT,
+                station TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
-    # 6. Audit Logs Table (System & Clinical Integrity Tracking)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS audit_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            action TEXT NOT NULL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            details TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-        )
-    """)
+        # Check and migrate users table schema if existing id column is INTEGER
+        try:
+            cursor.execute("PRAGMA table_info(users)")
+            user_cols = cursor.fetchall()
+            if user_cols:
+                id_col = next((c for c in user_cols if c[1] == 'id'), None)
+                if id_col and 'INT' in str(id_col[2]).upper():
+                    cursor.execute("""
+                        CREATE TABLE users_migrated (
+                            id TEXT PRIMARY KEY,
+                            username TEXT UNIQUE NOT NULL,
+                            password_hash TEXT NOT NULL,
+                            role TEXT DEFAULT 'bhw',
+                            full_name TEXT,
+                            purok TEXT,
+                            address TEXT,
+                            station TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """)
+                    cursor.execute("SELECT id, username, password_hash, role, full_name, purok, address, station, created_at FROM users")
+                    old_rows = cursor.fetchall()
+                    yy = datetime.utcnow().year % 100
+                    for idx, row in enumerate(old_rows, start=1):
+                        new_id = f"{yy:02d}-{idx:03d}"
+                        cursor.execute("""
+                            INSERT INTO users_migrated (id, username, password_hash, role, full_name, purok, address, station, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (new_id, row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8]))
+                    cursor.execute("DROP TABLE users")
+                    cursor.execute("ALTER TABLE users_migrated RENAME TO users")
+        except Exception as mig_err:
+            print(f"[DB Migration Notice] {mig_err}")
 
-    conn.commit()
-    conn.close()
-    print("[DB] SQLite database schema initialized (clean zero-state). Ready for live transactions.")
+        # Ensure purok and address columns exist if upgrading existing SQLite file
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN purok TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN address TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        # 6. Audit Logs Table (System & Clinical Integrity Tracking)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                action TEXT NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                details TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+        """)
+
+        conn.commit()
+        conn.close()
+        ensure_default_bhw_users()
+        print("[DB] SQLite database schema initialized. Ready for live transactions.")
+
+
+def get_next_user_id(year=None):
+    """
+    Generates the next sequential user ID in YY-NNN format (e.g., '26-001').
+    YY: 2-digit year (default: current year, e.g. 26).
+    NNN: 3-digit zero-padded sequential integer starting at 001.
+    """
+    yy = (year if year is not None else datetime.utcnow().year) % 100
+    prefix = f"{yy:02d}-"
+    rows = query_db("SELECT id FROM users WHERE id LIKE ? ORDER BY id DESC", (f"{prefix}%",))
+    highest_seq = 0
+    if rows:
+        for r in rows:
+            uid_str = str(r.get("id", ""))
+            if uid_str.startswith(prefix):
+                try:
+                    num = int(uid_str.split("-")[1])
+                    if num > highest_seq:
+                        highest_seq = num
+                except (IndexError, ValueError):
+                    pass
+    return f"{prefix}{highest_seq + 1:03d}"
+
+
+def ensure_default_bhw_users():
+    """Ensures the 7 standard BHW accounts from Poblacion 2 are registered with YY-NNN format IDs and cleanly separated purok and address."""
+    with app.app_context():
+        try:
+            bhws = [
+                ("charisma", "Charisma Astronomo", "Purok 1", "Poblacion 2, Nagcarlan, Laguna"),
+                ("marisa", "Marisa Pullan", "Purok 2", "Poblacion 2, Nagcarlan, Laguna"),
+                ("thess", "Marites Torres", "Purok 3", "Poblacion 2, Nagcarlan, Laguna"),
+                ("flora", "Flora Angeles", "Purok 4", "Poblacion 2, Nagcarlan, Laguna"),
+                ("grace", "Grace Yretarino", "Purok 5", "Poblacion 2, Nagcarlan, Laguna"),
+                ("michelle", "Michelle Oboza", "Purok 6", "Poblacion 2, Nagcarlan, Laguna"),
+                ("violy", "Violeta Esmijarda", "Purok 7", "Poblacion 2, Nagcarlan, Laguna")
+            ]
+            user_count = query_db("SELECT COUNT(*) as cnt FROM users", one=True)
+            yy = datetime.utcnow().year % 100
+            default_hash = generate_password_hash("password123", method="pbkdf2:sha256")
+            
+            if user_count and user_count["cnt"] == 0:
+                for idx, (username, full_name, purok, address) in enumerate(bhws, start=1):
+                    user_id = f"{yy:02d}-{idx:03d}"
+                    execute_db("""
+                        INSERT INTO users (id, username, password_hash, role, full_name, purok, address, station)
+                        VALUES (?, ?, ?, 'bhw', ?, ?, ?, ?)
+                    """, (user_id, username, default_hash, full_name, purok, address, purok))
+                print(f"[DB] Initialized standard BHW accounts for Poblacion 2 with {yy:02d}-NNN IDs.")
+            else:
+                # Sync existing users to keep station, purok, address, and YY-NNN IDs clean
+                for idx, (username, full_name, purok, address) in enumerate(bhws, start=1):
+                    expected_id = f"{yy:02d}-{idx:03d}"
+                    existing = query_db("""
+                        SELECT id, username FROM users 
+                        WHERE LOWER(username) = LOWER(?) 
+                           OR LOWER(username) LIKE ? 
+                           OR LOWER(full_name) = LOWER(?)
+                    """, (username, f"{username}%", full_name), one=True)
+                    if existing:
+                        matched_user = existing["username"]
+                        curr_id = str(existing.get("id", ""))
+                        if not curr_id.startswith(f"{yy:02d}-"):
+                            execute_db("UPDATE users SET id = ? WHERE username = ?", (expected_id, matched_user))
+                        execute_db("""
+                            UPDATE users
+                            SET username = ?, purok = ?, address = ?, station = ?, full_name = ?
+                            WHERE username = ?
+                        """, (username, purok, address, purok, full_name, matched_user))
+                    else:
+                        execute_db("""
+                            INSERT INTO users (id, username, password_hash, role, full_name, purok, address, station)
+                            VALUES (?, ?, ?, 'bhw', ?, ?, ?, ?)
+                        """, (expected_id, username, default_hash, full_name, purok, address, purok))
+        except Exception as err:
+            print(f"[DB Warning] Could not verify default BHW users: {err}")
 
 
 # --------------------------------------------------------------------------
@@ -225,15 +350,18 @@ def serve_static(filename):
 @app.route("/api/register", methods=["POST"])
 def register_user():
     """
-    Registers a new health station worker with salted password hashing.
-    Payload: { username, password, role, full_name, station }
+    Registers a new health station worker with salted password hashing and sequential YY-NNN ID format.
+    Payload: { username, password, role, full_name, station, purok, address, id }
     """
     data = request.get_json() or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
     role = data.get("role", "bhw").strip()
     full_name = data.get("full_name", "").strip()
-    station = data.get("station", "BHS Poblacion 2").strip()
+    station = data.get("station", "Purok 1").strip()
+    purok = data.get("purok", station).strip()
+    address = data.get("address", "Poblacion 2, Nagcarlan, Laguna").strip()
+    clean_purok = purok.split(",")[0].strip() if "," in purok else purok.strip()
 
     if not username or not password:
         return jsonify({"success": False, "error": "Username and password are required"}), 400
@@ -243,15 +371,18 @@ def register_user():
     if existing:
         return jsonify({"success": False, "error": f"Username '{username}' is already registered."}), 409
 
+    # Generate sequential YY-NNN user ID (e.g. '26-001')
+    user_id = data.get("id") or get_next_user_id()
+
     # Hash the password securely using PBKDF2:SHA256
     password_hash = generate_password_hash(password, method="pbkdf2:sha256")
 
-    user_id = execute_db("""
-        INSERT INTO users (username, password_hash, role, full_name, station)
-        VALUES (?, ?, ?, ?, ?)
-    """, (username, password_hash, role, full_name or username, station))
+    execute_db("""
+        INSERT INTO users (id, username, password_hash, role, full_name, purok, address, station)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, username, password_hash, role, full_name or username, clean_purok, address, clean_purok))
 
-    log_audit_event(user_id, "USER_REGISTERED", f"Created user '{username}' with role '{role}'.")
+    log_audit_event(user_id, "USER_REGISTERED", f"Created user '{username}' (ID: {user_id}) with role '{role}'.")
 
     return jsonify({
         "success": True,
@@ -261,7 +392,9 @@ def register_user():
             "username": username,
             "role": role,
             "full_name": full_name or username,
-            "station": station
+            "purok": clean_purok,
+            "address": address,
+            "station": clean_purok
         }
     }), 201
 
@@ -271,30 +404,60 @@ def register_user():
 def login_user():
     """
     Authenticates station worker credentials using secure password hash comparison.
-    Payload: { username, password, station }
+    Supports input via Staff ID (YY-NNN, e.g. 26-001), username, or full name.
+    Payload: { username / id, password, station }
     """
     data = request.get_json() or {}
-    username = data.get("username", "").strip()
+    identifier = (data.get("username") or data.get("user_id") or data.get("id") or "").strip()
     password = data.get("password", "").strip()
     station = data.get("station", "").strip()
 
-    if not username or not password:
-        return jsonify({"success": False, "error": "Username and password are required"}), 400
+    if not identifier or not password:
+        return jsonify({"success": False, "error": "Username/ID and password are required"}), 400
 
-    user = query_db("SELECT * FROM users WHERE username = ?", (username,), one=True)
-    if not user or not check_password_hash(user["password_hash"], password):
+    user = query_db("""
+        SELECT * FROM users 
+        WHERE LOWER(id) = LOWER(?) 
+           OR LOWER(username) = LOWER(?) 
+           OR LOWER(full_name) = LOWER(?)
+    """, (identifier, identifier, identifier), one=True)
+
+    if not user:
         log_audit_event(
-            user["id"] if user else None,
+            None,
             "LOGIN_FAILED",
-            f"Failed sign-in attempt for username '{username}'."
+            f"Failed sign-in attempt for non-existent username/staff ID '{identifier}'."
         )
-        return jsonify({"success": False, "error": "Invalid username or station security password."}), 401
+        return jsonify({"success": False, "error": "Account does not exist."}), 401
+
+    if not check_password_hash(user["password_hash"], password):
+        log_audit_event(
+            user["id"],
+            "LOGIN_FAILED",
+            f"Incorrect password attempt for user '{user['username']}' (ID: {user['id']})."
+        )
+        return jsonify({"success": False, "error": "Invalid Username/Password. Try again."}), 401
+
+    # Verify health station / purok if selected
+    if station:
+        user_purok = (user.get("purok") or user.get("station") or "").lower()
+        clean_selected_station = station.split(",")[0].strip().lower()
+        if user_purok and clean_selected_station and (clean_selected_station not in user_purok and user_purok not in clean_selected_station):
+            log_audit_event(
+                user["id"],
+                "LOGIN_FAILED",
+                f"Health station mismatch for user '{user['username']}': selected '{station}' vs assigned '{user.get('purok')}'."
+            )
+            return jsonify({"success": False, "error": f"Selected health station ({station}) does not match assigned station for {user.get('full_name')}."}), 401
 
     log_audit_event(
         user["id"],
         "LOGIN_SUCCESS",
-        f"User '{username}' logged in successfully at station '{station or user['station']}'."
+        f"User '{user['username']}' (ID: {user['id']}) logged in successfully at station '{station or user['station']}'."
     )
+
+    raw_purok = user.get("purok") or station or user.get("station") or "Purok 1"
+    clean_purok = raw_purok.split(",")[0].strip() if "," in raw_purok else raw_purok.strip()
 
     return jsonify({
         "success": True,
@@ -304,16 +467,34 @@ def login_user():
             "username": user["username"],
             "role": user["role"],
             "full_name": user.get("full_name") or user["username"],
-            "station": station or user.get("station") or "BHS Poblacion 2"
+            "purok": clean_purok,
+            "address": user.get("address") or "Poblacion 2, Nagcarlan, Laguna",
+            "station": clean_purok
         }
     })
 
 
 @app.route("/api/auth/users", methods=["GET"])
 def get_users():
-    """Retrieves registered terminal users (hashes strictly excluded)."""
-    users = query_db("SELECT id, username, role, full_name, station, created_at FROM users ORDER BY id ASC")
+    """Retrieves registered terminal users with cleanly separated purok and address."""
+    users = query_db("SELECT id, username, role, full_name, purok, address, station, created_at FROM users ORDER BY id ASC")
+    for u in users:
+        raw_p = u.get("purok") or u.get("station") or "Purok 1"
+        u["purok"] = raw_p.split(",")[0].strip() if "," in raw_p else raw_p.strip()
+        u["station"] = u["purok"]
+        if not u.get("address"):
+            u["address"] = "Poblacion 2, Nagcarlan, Laguna"
     return jsonify({"success": True, "count": len(users), "data": users})
+
+
+@app.route("/api/auth/stations", methods=["GET"])
+def get_stations():
+    """Retrieves available health stations / puroks from the database."""
+    stations = query_db("SELECT DISTINCT purok FROM users WHERE purok IS NOT NULL AND purok != '' ORDER BY purok ASC")
+    station_list = [s["purok"] for s in stations if s["purok"]]
+    if not station_list:
+        station_list = [f"Purok {i}" for i in range(1, 8)]
+    return jsonify({"success": True, "count": len(station_list), "data": station_list})
 
 
 # --------------------------------------------------------------------------
@@ -733,24 +914,25 @@ def request_inventory_restock():
 # --------------------------------------------------------------------------
 # Administrative Reset Endpoint
 # --------------------------------------------------------------------------
-@app.route("/api/admin/reset", methods=["POST"])
-def reset_database():
-    """Wipes all transactional records to return database to clean zero-state."""
-    execute_db("DELETE FROM appointments")
-    execute_db("DELETE FROM consultations")
-    execute_db("DELETE FROM patients")
-    execute_db("DELETE FROM inventory")
-    execute_db("DELETE FROM audit_logs")
-    return jsonify({"success": True, "message": "Database successfully reset to clean zero-state."})
+# @app.route("/api/admin/reset", methods=["POST"])
+# def reset_database():
+#     """Wipes all transactional records to return database to clean zero-state."""
+#     execute_db("DELETE FROM appointments")
+#     execute_db("DELETE FROM consultations")
+#     execute_db("DELETE FROM patients")
+#     execute_db("DELETE FROM inventory")
+#     execute_db("DELETE FROM audit_logs")
+#     return jsonify({"success": True, "message": "Database successfully reset to clean zero-state."})
 
 
 # --------------------------------------------------------------------------
 # Main Execution
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
-    init_db()
+    with app.app_context():
+        init_db()
     print("=" * 70)
     print(" BWC-HDMS Capstone Server running in offline mode")
-    print(" Access URL: http://127.0.0.1:5000/dashboardPage.html")
+    print(" Access URL: http://127.0.0.1:5000/loginPage.html")
     print("=" * 70)
     app.run(host="127.0.0.1", port=5000, debug=True)
