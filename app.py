@@ -24,7 +24,7 @@ from flask_migrate import Migrate
 # Import SQLAlchemy database and models
 from models import (
     db, User, Patient, Inventory, InventoryItem,
-    Appointment, UpcomingEvent, AuditLog, ActivityLog, Vital, Dispensation
+    Appointment, UpcomingEvent, AuditLog, ActivityLog, Vital, Dispensation, PatientFile
 )
 
 # --------------------------------------------------------------------------
@@ -351,6 +351,19 @@ def init_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 details TEXT,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+        """)
+
+        # 7. Patient Files & Attachments Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS PATIENT_FILES (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL,
+                file_name TEXT NOT NULL,
+                file_type TEXT,
+                file_path TEXT,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
             )
         """)
 
@@ -834,23 +847,41 @@ def reschedule_appointment(appt_id):
     return jsonify({"success": True, "message": "Appointment rescheduled successfully", "data": updated_appt})
 
 
+@app.route("/api/dashboard/stats", methods=["GET"])
 @app.route("/api/appointments/stats", methods=["GET"])
 def get_appointment_stats():
     """
     Provides aggregated counts for the dashboard cards:
-    - Due Today
-    - Overdue / Defaulted
-    - Pending This Month
-    - Completed This Month
+    - total_patients (Total Patients in Poblacion 2)
+    - low_stock (Aggregate count of low stock and depleted stock items)
+    - due_today (Due Today Follow-ups)
+    - overdue_defaulted (Overdue / Defaulted)
+    - pending_this_month
+    - completed_this_month
     """
     today_str = date.today().isoformat()
     current_month = f"{date.today().month:02d}"
 
+    # 1. Total Patients registered in Poblacion 2
+    total_patients = query_db("""
+        SELECT COUNT(*) as count FROM patients
+    """, one=True)["count"]
+
+    # 2. Low Stock & Depleted Stock Medicine Aggregation
+    low_stock = query_db("""
+        SELECT COUNT(*) as count FROM inventory
+        WHERE current_stock <= reorder_level 
+           OR current_stock <= 0
+           OR LOWER(status) IN ('low stock', 'critical low', 'depleted', 'low', 'out of stock')
+    """, one=True)["count"]
+
+    # 3. Appointments Due Today
     due_today = query_db("""
         SELECT COUNT(*) as count FROM appointments
         WHERE scheduled_date = ? AND status = 'Pending'
     """, (today_str,), one=True)["count"]
 
+    # 4. Overdue / Defaulted Appointments
     overdue = query_db("""
         SELECT COUNT(*) as count FROM appointments
         WHERE status = 'Defaulted' OR (status = 'Pending' AND scheduled_date < ?)
@@ -869,6 +900,11 @@ def get_appointment_stats():
     return jsonify({
         "success": True,
         "data": {
+            "total_patients": total_patients,
+            "total_patients_poblacion_2": total_patients,
+            "active_patients": total_patients,
+            "low_stock": low_stock,
+            "low_stock_medicines": low_stock,
             "due_today": due_today,
             "overdue_defaulted": overdue,
             "completed_this_month": completed_month,
@@ -1038,6 +1074,109 @@ def reschedule_upcoming_event(event_id):
 # --------------------------------------------------------------------------
 # RESTful API Endpoints - Consultations & Clinical Follow-up Engine
 # --------------------------------------------------------------------------
+@app.route("/api/consultations", methods=["GET"])
+def get_consultations():
+    """
+    Retrieves recorded clinical consultations joined with patient metadata.
+    Supports optional query parameters:
+      - limit: Max records to return (default 100, 0 for all)
+      - patient_name: Filter by patient name (case-insensitive substring)
+    """
+    limit = request.args.get("limit", default=100, type=int)
+    patient_name = request.args.get("patient_name", "").strip()
+
+    query = """
+        SELECT c.id, c.patient_name, c.sys_bp, c.dia_bp, c.glucose,
+               c.weight, c.height, c.bmi_result, c.risk_level, c.remarks,
+               c.consult_date, c.created_at,
+               p.id AS patient_id, p.condition AS patient_condition, p.purok, p.age, p.sex
+        FROM consultations c
+        LEFT JOIN patients p ON TRIM(LOWER(c.patient_name)) = TRIM(LOWER(p.name))
+    """
+    params = []
+    if patient_name:
+        query += " WHERE LOWER(c.patient_name) LIKE LOWER(?)"
+        params.append(f"%{patient_name}%")
+
+    query += " ORDER BY c.consult_date DESC, c.id DESC"
+    if limit and limit > 0:
+        query += " LIMIT ?"
+        params.append(limit)
+
+    rows = query_db(query, tuple(params))
+    consultations_list = []
+    for r in rows:
+        consultations_list.append({
+            "id": r["id"],
+            "patient_id": r["patient_id"],
+            "patient_name": r["patient_name"],
+            "patient": r["patient_name"],
+            "sys_bp": r["sys_bp"],
+            "dia_bp": r["dia_bp"],
+            "sys": r["sys_bp"],
+            "dia": r["dia_bp"],
+            "glucose": r["glucose"],
+            "glu": r["glucose"],
+            "weight": r["weight"],
+            "height": r["height"],
+            "bmi_result": r["bmi_result"],
+            "risk_level": r["risk_level"],
+            "risk": r["risk_level"],
+            "remarks": r["remarks"],
+            "consult_date": r["consult_date"],
+            "date": r["consult_date"],
+            "patient_condition": r["patient_condition"] or "Hypertension Only",
+            "condition": r["patient_condition"] or "Hypertension Only",
+            "purok": r["purok"],
+            "age": r["age"],
+            "sex": r["sex"],
+            "created_at": r["created_at"]
+        })
+
+    return jsonify({
+        "success": True,
+        "count": len(consultations_list),
+        "data": consultations_list
+    })
+
+
+@app.route("/api/vitals", methods=["GET"])
+def get_vitals():
+    """
+    Retrieves recorded clinical vitals logs joined with patient metadata.
+    Supports optional query parameters:
+      - limit: Max records to return (default 100, 0 for all)
+      - patient_id: Filter by patient ID
+    """
+    limit = request.args.get("limit", default=100, type=int)
+    patient_id = request.args.get("patient_id", type=int)
+
+    query = """
+        SELECT v.id, v.patient_id, v.blood_pressure, v.sys_bp, v.dia_bp,
+               v.glucose, v.temperature, v.heart_rate, v.weight, v.height,
+               v.bmi_result, v.risk_level, v.remarks, v.recorded_at,
+               p.name AS patient_name, p.condition AS patient_condition, p.purok, p.age, p.sex
+        FROM vitals v
+        JOIN patients p ON v.patient_id = p.id
+    """
+    params = []
+    if patient_id:
+        query += " WHERE v.patient_id = ?"
+        params.append(patient_id)
+
+    query += " ORDER BY v.recorded_at DESC, v.id DESC"
+    if limit and limit > 0:
+        query += " LIMIT ?"
+        params.append(limit)
+
+    rows = query_db(query, tuple(params))
+    return jsonify({
+        "success": True,
+        "count": len(rows),
+        "data": rows
+    })
+
+
 @app.route("/api/consultations", methods=["POST"])
 def submit_consultation():
     """
@@ -1206,6 +1345,11 @@ def get_patients():
         p_dict["medical_history"] = p_dict["medHistory"]
         p_dict["allergies"] = p_dict.get("allergies") or "None reported"
 
+        # Query files from PATIENT_FILES
+        p_files = query_db("SELECT * FROM PATIENT_FILES WHERE patient_id = ? ORDER BY uploaded_at DESC", (p_dict["id"],))
+        p_dict["files"] = p_files
+        p_dict["attachments"] = [f["file_name"] for f in p_files] if p_files else []
+
         formatted_patients.append(p_dict)
 
     return jsonify({"success": True, "count": len(formatted_patients), "data": formatted_patients})
@@ -1292,10 +1436,130 @@ def register_patient():
         gov_programs_json, allergies, health_risks_json, med_history
     ))
 
+    # Save attached files into PATIENT_FILES
+    files_input = data.get("files") or data.get("attachments") or []
+    if files_input:
+        for f in files_input:
+            if isinstance(f, dict):
+                f_name = f.get("file_name") or f.get("name") or "Attachment.pdf"
+                f_type = f.get("file_type") or f.get("type") or (f_name.split(".")[-1] if "." in f_name else "pdf")
+                f_path = f.get("file_path") or f.get("path") or f"uploads/{patient_id}_{f_name}"
+            else:
+                f_name = str(f).strip()
+                f_type = f_name.split(".")[-1] if "." in f_name else "pdf"
+                f_path = f"uploads/{patient_id}_{f_name}"
+            if f_name:
+                execute_db("""
+                    INSERT INTO PATIENT_FILES (patient_id, file_name, file_type, file_path, uploaded_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (patient_id, f_name, f_type, f_path))
+
     log_audit_event(handler_id, "PATIENT_REGISTERED", f"Registered new client '{name}' in TCR (Handler ID: {handler_id}).")
 
     new_patient = query_db("SELECT * FROM patients WHERE id = ?", (patient_id,), one=True)
     return jsonify({"success": True, "message": "Patient registered successfully", "data": new_patient}), 201
+
+
+@app.route("/api/patients/<int:patient_id>/files", methods=["GET", "POST"])
+def handle_patient_files(patient_id):
+    """Retrieves or uploads documents linked to PATIENT_FILES table for a specific patient."""
+    patient = query_db("SELECT id, name FROM patients WHERE id = ?", (patient_id,), one=True)
+    if not patient:
+        return jsonify({"success": False, "error": "Patient not found"}), 404
+
+    if request.method == "POST":
+        file_name = None
+        file_type = None
+        file_path = None
+
+        if "file" in request.files:
+            f = request.files["file"]
+            if f and f.filename:
+                file_name = f.filename
+                file_type = file_name.split(".")[-1].lower() if "." in file_name else "file"
+                file_path = f"uploads/{patient_id}_{file_name}"
+        else:
+            data = request.get_json() or {}
+            file_name = (data.get("file_name") or data.get("name") or "").strip()
+            file_type = data.get("file_type") or (file_name.split(".")[-1].lower() if "." in file_name else "pdf")
+            file_path = data.get("file_path") or f"uploads/{patient_id}_{file_name}"
+
+        if not file_name:
+            return jsonify({"success": False, "error": "File name is required"}), 400
+
+        file_id = execute_db("""
+            INSERT INTO PATIENT_FILES (patient_id, file_name, file_type, file_path, uploaded_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (patient_id, file_name, file_type, file_path))
+
+        log_audit_event(None, "PATIENT_FILE_UPLOADED", f"Uploaded '{file_name}' for patient #{patient_id} ({patient['name']}).")
+
+        new_file = query_db("SELECT * FROM PATIENT_FILES WHERE id = ?", (file_id,), one=True)
+        return jsonify({"success": True, "message": "File uploaded and recorded in PATIENT_FILES", "data": new_file}), 201
+
+    files = query_db("SELECT * FROM PATIENT_FILES WHERE patient_id = ? ORDER BY uploaded_at DESC", (patient_id,))
+    return jsonify({"success": True, "count": len(files), "data": files})
+
+
+@app.route("/api/patients/<int:patient_id>/emergency-contact", methods=["PUT", "POST"])
+def update_patient_emergency_contact(patient_id):
+    """Updates emergency contact details (name, relationship, phone number) for a patient."""
+    patient = query_db("SELECT id, name FROM patients WHERE id = ?", (patient_id,), one=True)
+    if not patient:
+        return jsonify({"success": False, "error": "Patient not found"}), 404
+
+    data = request.get_json() or {}
+    emergency_name = (data.get("emergency_contact_name") or data.get("emergencyName") or "").strip()
+    emergency_rel = (data.get("emergency_contact_relationship") or data.get("emergencyRel") or "").strip()
+    emergency_phone = (data.get("emergency_contact_number") or data.get("emergencyPhone") or "").strip()
+
+    execute_db("""
+        UPDATE patients
+        SET emergency_contact_name = ?,
+            emergency_contact_relationship = ?,
+            emergency_contact_number = ?
+        WHERE id = ?
+    """, (emergency_name, emergency_rel, emergency_phone, patient_id))
+
+    log_audit_event(None, "EMERGENCY_CONTACT_UPDATED", f"Updated emergency contact for patient #{patient_id} ({patient['name']}): {emergency_name} ({emergency_rel}) {emergency_phone}.")
+
+    updated = query_db("SELECT * FROM patients WHERE id = ?", (patient_id,), one=True)
+    return jsonify({"success": True, "message": "Emergency contact updated successfully", "data": updated})
+
+
+@app.route("/api/patients/<int:patient_id>/enrollments", methods=["POST", "PUT"])
+def update_patient_enrollments(patient_id):
+    """Adds or updates government and social program enrollments for a patient."""
+    patient = query_db("SELECT id, name, government_programs FROM patients WHERE id = ?", (patient_id,), one=True)
+    if not patient:
+        return jsonify({"success": False, "error": "Patient not found"}), 404
+
+    data = request.get_json() or {}
+    new_program = (data.get("program") or "").strip()
+    programs_list = data.get("programs") or data.get("government_programs")
+
+    current_progs = []
+    if patient["government_programs"]:
+        try:
+            raw_gp = str(patient["government_programs"]).strip()
+            current_progs = json.loads(raw_gp) if raw_gp.startswith("[") else [raw_gp]
+        except Exception:
+            current_progs = [patient["government_programs"]]
+
+    if isinstance(programs_list, list):
+        final_progs = programs_list
+    elif new_program:
+        if new_program not in current_progs:
+            current_progs.append(new_program)
+        final_progs = current_progs
+    else:
+        return jsonify({"success": False, "error": "No program specified"}), 400
+
+    gov_json = json.dumps(final_progs)
+    execute_db("UPDATE patients SET government_programs = ? WHERE id = ?", (gov_json, patient_id))
+    log_audit_event(None, "PATIENT_ENROLLMENT_UPDATED", f"Updated program enrollments for patient #{patient_id} ({patient['name']}): {final_progs}.")
+
+    return jsonify({"success": True, "message": "Enrollments updated successfully", "programs": final_progs})
 
 
 # --------------------------------------------------------------------------
@@ -1305,6 +1569,19 @@ def register_patient():
 def get_inventory():
     """Retrieves all medicine inventory stock items."""
     items = query_db("SELECT * FROM inventory ORDER BY item_name ASC")
+    return jsonify({"success": True, "count": len(items), "data": items})
+
+
+@app.route("/api/inventory/critical", methods=["GET"])
+def get_critical_inventory():
+    """Retrieves all medicine inventory stock items with low or depleted stock levels."""
+    items = query_db("""
+        SELECT * FROM inventory
+        WHERE current_stock <= reorder_level 
+           OR current_stock <= 0
+           OR LOWER(status) IN ('low stock', 'critical low', 'depleted', 'low', 'out of stock')
+        ORDER BY current_stock ASC, id ASC
+    """)
     return jsonify({"success": True, "count": len(items), "data": items})
 
 

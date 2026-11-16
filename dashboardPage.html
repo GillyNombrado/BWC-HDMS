@@ -130,7 +130,7 @@
             <!-- 4 Key Stat Cards -->
             <div class="stat-cards-grid">
                 <div class="stat-card stat-card-blue">
-                    <div class="stat-card-title">Active TCR Patients</div>
+                    <div class="stat-card-title">Total Patients in Poblacion 2</div>
                     <div class="stat-card-value text-primary" id="statActive">0</div>
                     <div class="stat-card-desc text-muted"><i class="bi bi-people" style="font-size: 1.1rem;"></i> Total registered</div>
                 </div>
@@ -186,10 +186,11 @@
 
                 <!-- Critical Inventory Alerts -->
                 <div class="card-custom">
-                    <div class="card-header-custom">
-                        <h5 class="card-header-title">Critical Inventory Alert</h5>
+                    <div class="card-header-custom d-flex justify-between align-center">
+                        <h5 class="card-header-title mb-0">Critical Inventory Alert</h5>
+                        <span class="badge badge-danger-subtle" id="criticalAlertCountBadge" style="font-size: 0.75rem;">Loading Alerts...</span>
                     </div>
-                    <div class="card-body-custom d-flex flex-column justify-between gap-3" id="criticalInventoryAlerts">
+                    <div class="card-body-custom d-flex flex-column gap-3" id="criticalInventoryAlerts" style="max-height: 480px; overflow-y: auto;">
                         <div class="text-center py-4 text-muted">
                             <i class="bi bi-shield-check d-block mb-1" style="font-size: 1.5rem; opacity: 0.5;"></i>
                             <span>No critical stock alerts. All supplies adequate or unseeded.</span>

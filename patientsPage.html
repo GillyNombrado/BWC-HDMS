@@ -456,113 +456,184 @@
 
     <!-- Patient Record Detail Modal -->
     <div class="modal-overlay hidden" id="patientRecordModal" role="dialog" aria-modal="true">
-        <div class="modal-dialog-box modal-dialog-xl">
-            <div class="modal-header-custom" style="border-bottom: 1px solid var(--border-color);">
-                <div>
-                    <h5 class="modal-title-custom">
-                        <i class="bi bi-person-badge-fill text-primary me-2"></i> Client Health Profile
-                    </h5>
-                    <p class="text-muted mb-0" style="font-size: 0.75rem;">Verified Target Client Registry (TCR) record</p>
+        <div class="modal-dialog-box modal-dialog-xl" style="max-width: 820px; border-radius: 12px; overflow: hidden;">
+            <div class="modal-header-custom p-4" style="border-bottom: 1px solid var(--border-color); background: var(--bg-surface-secondary, #f8fafc);">
+                <div class="d-flex align-center gap-3">
+                    <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(13, 110, 253, 0.12); color: var(--bs-primary, #0d6efd); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="bi bi-person-badge-fill" style="font-size: 1.35rem;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title-custom mb-1" style="font-size: 1.15rem; font-weight: 700;">Client Health Profile</h5>
+                        <p class="text-muted mb-0" style="font-size: 0.8rem;">Target Client Registry (TCR) &bull; Primary Healthcare Record</p>
+                    </div>
                 </div>
-                <button type="button" class="modal-close-btn" onclick="closeModal('patientRecordModal')">&times;</button>
+                <button type="button" class="modal-close-btn" onclick="closeModal('patientRecordModal')" title="Close">&times;</button>
             </div>
-            <div class="modal-body-custom">
+            <div class="modal-body-custom px-4 py-4" style="display: flex; flex-direction: column; gap: 1.35rem;">
                 <!-- Patient Header Card -->
-                <div class="card-custom mb-3" style="background-color: var(--bg-surface-secondary); padding: 1.25rem; border-radius: 8px;">
-                    <div class="d-flex justify-between items-center">
+                <div class="card-custom p-4" style="background-color: var(--bg-surface-secondary, #f8fafc); border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div class="d-flex justify-between items-center" style="flex-wrap: wrap; gap: 1rem;">
                         <div>
-                            <h4 class="fw-bold mb-1" id="recName" style="color: var(--text-main);">Juan Dela Cruz</h4>
-                            <p class="text-muted mb-1" id="recDemographics" style="font-size: 0.82rem;">54 years old • Male • Born Oct 14, 1972</p>
-                            <div class="d-flex flex-wrap gap-2 text-muted" style="font-size: 0.76rem;">
-                                <span><i class="bi bi-geo-alt-fill text-danger me-1"></i><span id="recAddress">Purok 3, San Jose</span></span>
-                                <span>•</span>
-                                <span><i class="bi bi-telephone-fill text-success me-1"></i><span id="recContact">0917-123-4567</span></span>
-                                <span>•</span>
+                            <h4 class="fw-bold mb-1" id="recName" style="color: var(--text-heading, #0f172a); font-size: 1.25rem;">Juan Dela Cruz</h4>
+                            <p class="text-muted mb-2" id="recDemographics" style="font-size: 0.88rem;">54 years old &bull; Male &bull; Born Oct 14, 1972</p>
+                            <div class="d-flex flex-wrap gap-2 text-muted" style="font-size: 0.82rem;">
+                                <span><i class="bi bi-geo-alt-fill text-danger me-1"></i><span id="recAddress" class="text-main">Purok 3, Poblacion 2</span></span>
+                                <span>&bull;</span>
+                                <span><i class="bi bi-telephone-fill text-success me-1"></i><span id="recContact" class="text-main">0917-123-4567</span></span>
+                                <span>&bull;</span>
                                 <span>PhilHealth: <span id="recPh" class="fw-semibold text-main">12-345678901-2</span></span>
                             </div>
                         </div>
-                        <div class="text-right">
-                            <span class="badge badge-primary-subtle" id="recConditionBadge" style="font-size: 0.8rem;">Hypertension Only</span>
-                            <div class="mt-1">
-                                <span class="badge badge-warning" id="recRiskBadge">Moderate</span>
+                        <div class="text-right d-flex flex-column align-end gap-1.5">
+                            <span class="badge badge-primary-subtle" id="recConditionBadge" style="font-size: 0.82rem; padding: 0.35rem 0.65rem;">Hypertension Only</span>
+                            <div>
+                                <span class="badge badge-warning" id="recRiskBadge" style="font-size: 0.78rem; padding: 0.25rem 0.55rem;">Moderate</span>
                             </div>
-                            <div class="mt-1" style="font-size: 0.72rem; color: var(--text-muted);">
-                                Diagnosed: <span id="recDiagnosisDate" class="fw-medium text-main">Oct 14, 2022</span>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                                Diagnosed: <span id="recDiagnosisDate" class="fw-semibold text-main">Oct 14, 2022</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Emergency Contact Card -->
-                <div class="mb-3">
-                    <label class="form-label d-flex align-center">
-                        <i class="bi bi-telephone-plus text-warning me-1.5"></i> Emergency Contact (Relative / Guardian)
-                    </label>
-                    <div class="p-2.5 rounded d-flex justify-between align-center" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color);">
+                <!-- Emergency Contact Card with Edit Action -->
+                <div>
+                    <div class="d-flex justify-between align-center mb-2">
+                        <label class="form-label mb-0 d-flex align-center" style="font-weight: 600; font-size: 0.88rem;">
+                            <i class="bi bi-telephone-plus text-warning me-1.5"></i> Emergency Contact (Relative / Guardian)
+                        </label>
+                        <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-center gap-1" id="btnEditEmergencyContact" onclick="toggleEditEmergencyContact()" style="padding: 0.25rem 0.65rem; font-size: 0.78rem;">
+                            <i class="bi bi-pencil-square"></i> <span id="lblEditEmergencyBtn">Edit</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Display Mode -->
+                    <div id="recEmergencyDisplayCard" class="p-3.5 rounded d-flex justify-between align-center" style="background-color: var(--bg-surface-secondary, #f8fafc); border: 1px solid var(--border-color); border-radius: 8px;">
                         <div>
-                            <div class="fw-semibold text-main" id="recEmergencyName">Juana Dela Cruz</div>
-                            <small class="text-muted" id="recEmergencyRel">Spouse</small>
+                            <div class="fw-semibold text-main" id="recEmergencyName" style="font-size: 0.95rem;">Juana Dela Cruz</div>
+                            <small class="text-muted" id="recEmergencyRel" style="font-size: 0.8rem;">Spouse</small>
                         </div>
-                        <div class="d-flex align-center gap-1">
-                            <i class="bi bi-phone text-primary"></i>
-                            <span class="fw-medium text-main" id="recEmergencyPhone">0918-987-6543</span>
+                        <div class="d-flex align-center gap-2">
+                            <i class="bi bi-telephone-fill text-primary"></i>
+                            <span class="fw-semibold text-main" id="recEmergencyPhone" style="font-size: 0.9rem;">0918-987-6543</span>
+                        </div>
+                    </div>
+
+                    <!-- Edit Form (Inline) -->
+                    <div id="recEmergencyEditForm" class="p-3.5 rounded hidden" style="background-color: var(--bg-surface-secondary, #f8fafc); border: 1px solid var(--bs-primary, #0d6efd); border-radius: 8px;">
+                        <div class="grid-3-col mb-3">
+                            <div class="form-group mb-0">
+                                <label class="form-label" style="font-size: 0.78rem;">Contact Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm" id="editEmergencyName" placeholder="Full name">
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="form-label" style="font-size: 0.78rem;">Relationship <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" id="editEmergencyRel">
+                                    <option value="Spouse">Spouse</option>
+                                    <option value="Child / Daughter / Son">Child / Daughter / Son</option>
+                                    <option value="Parent (Mother/Father)">Parent (Mother/Father)</option>
+                                    <option value="Sibling">Sibling</option>
+                                    <option value="Guardian">Guardian</option>
+                                    <option value="Relative">Relative</option>
+                                    <option value="Neighbor / BHW">Neighbor / BHW</option>
+                                </select>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="form-label" style="font-size: 0.78rem;">Phone Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm" id="editEmergencyPhone" placeholder="09XX-XXX-XXXX">
+                            </div>
+                        </div>
+                        <div class="d-flex justify-end gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary px-3" onclick="toggleEditEmergencyContact(false)">Cancel</button>
+                            <button type="button" class="btn btn-sm btn-primary px-3" onclick="saveEmergencyContact()"><i class="bi bi-check-lg me-1"></i> Save Changes</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Government & Social Programs -->
-                <div class="mb-3">
-                    <label class="form-label d-flex align-center">
-                        <i class="bi bi-card-checklist text-primary me-1.5"></i> Government & Social Program Enrollments
-                    </label>
-                    <div id="recProgramsContainer" class="d-flex flex-wrap gap-1 p-2 rounded" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color); min-height: 42px;">
+                <!-- Government & Social Programs with Add Button -->
+                <div>
+                    <div class="d-flex justify-between align-center mb-2">
+                        <label class="form-label mb-0 d-flex align-center" style="font-weight: 600; font-size: 0.88rem;">
+                            <i class="bi bi-card-checklist text-primary me-1.5"></i> Government & Social Program Enrollments
+                        </label>
+                        <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-center gap-1" onclick="toggleAddEnrollmentInput()" style="padding: 0.25rem 0.65rem; font-size: 0.78rem;">
+                            <i class="bi bi-plus-lg"></i> <span>Add Program</span>
+                        </button>
+                    </div>
+
+                    <!-- Quick Add Enrollment Panel -->
+                    <div id="addEnrollmentPanel" class="p-2.5 mb-2 rounded hidden" style="background: var(--bg-surface-secondary, #f8fafc); border: 1px dashed var(--bs-primary, #0d6efd); border-radius: 8px;">
+                        <div class="d-flex align-center gap-2" style="flex-wrap: wrap;">
+                            <select class="form-select form-select-sm" id="newEnrollmentSelect" style="flex: 2; min-width: 200px;">
+                                <option value="" disabled selected>Select Program to Add...</option>
+                                <option value="Senior Citizen (OSCA)">Senior Citizen (OSCA)</option>
+                                <option value="PhilHealth Konsulta">PhilHealth Konsulta</option>
+                                <option value="4Ps Beneficiary (Pantawid Pamilya)">4Ps Beneficiary (Pantawid Pamilya)</option>
+                                <option value="Person with Disability (PWD)">Person with Disability (PWD)</option>
+                                <option value="Solo Parent ID Holder">Solo Parent ID Holder</option>
+                                <option value="Indigenous Peoples (IP)">Indigenous Peoples (IP)</option>
+                                <option value="Barangay Indigent Program">Barangay Indigent Program</option>
+                            </select>
+                            <input type="text" class="form-control form-control-sm" id="newEnrollmentCustom" placeholder="Or custom program name" style="flex: 2; min-width: 180px;">
+                            <button type="button" class="btn btn-sm btn-primary px-3" onclick="confirmAddEnrollment()"><i class="bi bi-check-lg me-1"></i> Add</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAddEnrollmentInput(false)">&times;</button>
+                        </div>
+                    </div>
+
+                    <div id="recProgramsContainer" class="d-flex flex-wrap gap-2 p-3 rounded" style="background-color: var(--bg-surface-secondary, #f8fafc); border: 1px solid var(--border-color); min-height: 48px; border-radius: 8px;">
                         <!-- Badges dynamically injected -->
                     </div>
                 </div>
 
                 <!-- Health Risks & Known Allergies -->
-                <div class="grid-2-col mb-3">
+                <div class="grid-2-col" style="gap: 1.25rem;">
                     <div>
-                        <label class="form-label d-flex align-center">
+                        <label class="form-label d-flex align-center mb-2" style="font-weight: 600; font-size: 0.88rem;">
                             <i class="bi bi-shield-exclamation text-danger me-1.5"></i> Pre-existing Health Risks
                         </label>
-                        <div id="recRisksContainer" class="d-flex flex-wrap gap-1 p-2 rounded" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color); min-height: 42px;">
+                        <div id="recRisksContainer" class="d-flex flex-wrap gap-1.5 p-3 rounded" style="background-color: var(--bg-surface-secondary, #f8fafc); border: 1px solid var(--border-color); min-height: 48px; border-radius: 8px;">
                             <!-- Health risks dynamically injected -->
                         </div>
                     </div>
                     <div>
-                        <label class="form-label d-flex align-center">
+                        <label class="form-label d-flex align-center mb-2" style="font-weight: 600; font-size: 0.88rem;">
                             <i class="bi bi-exclamation-octagon text-danger me-1.5"></i> Known Allergies
                         </label>
-                        <div class="p-2 rounded" id="recAllergies" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.8rem; min-height: 42px; display: flex; align-items: center;">
+                        <div class="p-3 rounded" id="recAllergies" style="background-color: var(--bg-surface-secondary, #f8fafc); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.85rem; min-height: 48px; display: flex; align-items: center; border-radius: 8px;">
                             <!-- Allergies dynamically injected -->
                         </div>
                     </div>
                 </div>
 
                 <!-- Past Illnesses & Clinical Background -->
-                <div class="mb-3">
-                    <label class="form-label d-flex align-center">
+                <div>
+                    <label class="form-label d-flex align-center mb-2" style="font-weight: 600; font-size: 0.88rem;">
                         <i class="bi bi-file-earmark-medical text-primary me-1.5"></i> Medical History & Clinical Background
                     </label>
-                    <div class="p-2.5 rounded text-sm" id="recMedHistory" style="background-color: var(--bg-surface-secondary); border: 1px solid var(--border-color); color: var(--text-main); white-space: pre-wrap; min-height: 54px; font-size: 0.82rem; line-height: 1.45;">
+                    <div class="p-3 rounded text-sm" id="recMedHistory" style="background-color: var(--bg-surface-secondary, #f8fafc); border: 1px solid var(--border-color); color: var(--text-main); white-space: pre-wrap; min-height: 56px; font-size: 0.86rem; line-height: 1.6; border-radius: 8px;">
                         <!-- Medical history dynamically injected -->
                     </div>
                 </div>
 
-                <!-- Digital Document Attachments -->
-                <div class="mb-2">
-                    <label class="form-label d-flex align-center">
-                        <i class="bi bi-paperclip text-primary me-1.5"></i> Attached Supporting Documents
-                    </label>
-                    <div id="recAttachmentsContainer" class="space-y-1">
+                <!-- Digital Document Attachments with Upload Button -->
+                <div>
+                    <div class="d-flex justify-between align-center mb-2">
+                        <label class="form-label mb-0 d-flex align-center" style="font-weight: 600; font-size: 0.88rem;">
+                            <i class="bi bi-paperclip text-primary me-1.5"></i> Attached Supporting Documents (PATIENT_FILES)
+                        </label>
+                        <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-center gap-1" onclick="document.getElementById('profileAttachmentFileInput').click()" style="padding: 0.25rem 0.65rem; font-size: 0.78rem;">
+                            <i class="bi bi-plus-lg"></i> <span>Upload Document</span>
+                        </button>
+                        <input type="file" id="profileAttachmentFileInput" class="hidden" accept=".pdf,image/*,.doc,.docx" onchange="handleProfileDocUpload(this)">
+                    </div>
+                    <div id="recAttachmentsContainer" class="space-y-2 p-3 rounded" style="background-color: var(--bg-surface-secondary, #f8fafc); border: 1px solid var(--border-color); min-height: 58px; border-radius: 8px;">
                         <!-- Attachment chips dynamically injected -->
                     </div>
                 </div>
             </div>
-            <div class="modal-footer-custom d-flex justify-between align-center">
-                <span class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-shield-check text-success me-1"></i> RA 10173 Data Privacy Compliant</span>
-                <button type="button" class="btn btn-outline-primary btn-sm" onclick="closeModal('patientRecordModal')">Close Record</button>
+            <div class="modal-footer-custom d-flex justify-between align-center p-3.5 px-4" style="border-top: 1px solid var(--border-color); background: var(--bg-surface-secondary, #f8fafc);">
+                <span class="text-muted" style="font-size: 0.78rem;"><i class="bi bi-shield-check text-success me-1"></i> RA 10173 Data Privacy Compliant &bull; Verified Database Records</span>
+                <button type="button" class="btn btn-outline-primary btn-sm px-4 fw-semibold" onclick="closeModal('patientRecordModal')">Close Record</button>
             </div>
         </div>
     </div>

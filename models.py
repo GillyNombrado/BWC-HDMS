@@ -110,6 +110,7 @@ class Patient(db.Model):
     vitals = db.relationship('Vital', back_populates='patient', lazy=True, cascade='all, delete-orphan')
     dispensations = db.relationship('Dispensation', back_populates='patient', lazy=True, cascade='all, delete-orphan')
     appointments = db.relationship('Appointment', back_populates='patient', lazy=True, cascade='all, delete-orphan')
+    files = db.relationship('PatientFile', back_populates='patient', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
         import json
@@ -168,6 +169,8 @@ class Patient(db.Model):
             'healthRisks': risks,
             'medical_history': self.medical_history,
             'medHistory': self.medical_history,
+            'files': [f.to_dict() for f in self.files] if self.files else [],
+            'attachments': [f.file_name for f in self.files] if self.files else [],
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
@@ -362,3 +365,74 @@ class UpcomingEvent(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None
         }
+
+
+# ==============================================================================
+# 9. Patient Files & Attachments Model
+# ==============================================================================
+class PatientFile(db.Model):
+    __tablename__ = 'PATIENT_FILES'
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id', ondelete='CASCADE'), nullable=False)
+    file_name = db.Column(db.Text, nullable=False)
+    file_type = db.Column(db.Text, nullable=True)
+    file_path = db.Column(db.Text, nullable=True)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    patient = db.relationship('Patient', back_populates='files')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'patient_id': self.patient_id,
+            'file_name': self.file_name,
+            'file_type': self.file_type,
+            'file_path': self.file_path,
+            'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None
+        }
+
+
+# ==============================================================================
+# 10. Clinical Consultations Ledger Model
+# ==============================================================================
+class Consultation(db.Model):
+    __tablename__ = 'consultations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_name = db.Column(db.Text, nullable=False)
+    sys_bp = db.Column(db.Integer, nullable=True)
+    dia_bp = db.Column(db.Integer, nullable=True)
+    glucose = db.Column(db.Integer, nullable=True)
+    weight = db.Column(db.Float, nullable=True)
+    height = db.Column(db.Float, nullable=True)
+    bmi_result = db.Column(db.Text, nullable=True)
+    risk_level = db.Column(db.Text, nullable=True)
+    remarks = db.Column(db.Text, nullable=True)
+    consult_date = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'patient_name': self.patient_name,
+            'patient': self.patient_name,
+            'sys_bp': self.sys_bp,
+            'dia_bp': self.dia_bp,
+            'sys': self.sys_bp,
+            'dia': self.dia_bp,
+            'glucose': self.glucose,
+            'glu': self.glucose,
+            'weight': self.weight,
+            'height': self.height,
+            'bmi_result': self.bmi_result,
+            'risk_level': self.risk_level,
+            'risk': self.risk_level,
+            'remarks': self.remarks,
+            'consult_date': self.consult_date,
+            'date': self.consult_date,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+

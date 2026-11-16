@@ -244,13 +244,273 @@
             fetch(BACKEND_PATIENTS_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(patientRecord)
+                body: JSON.stringify({
+                    ...patientRecord,
+                    files: stagedUploadFiles.map(f => ({ file_name: f.name, file_type: f.name.split('.').pop() }))
+                })
+            }).then(r => r.json()).then(res => {
+                if (res.success && res.data && res.data.id) {
+                    patientRecord.id = res.data.id;
+                    localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patientRegistryData));
+                }
             }).catch(() => {});
         } catch (e) {}
 
         closeModal('patientModal');
         document.getElementById('newPatientForm').reset();
-        showNotification(`Resident ${fullName} registered in TCR.`, 'success');
+        showNotification(`Resident ${fullName} registered in TCR with attachments linked to PATIENT_FILES.`, 'success');
+    }
+
+    let activeProfilePatient = null;
+
+    function renderAttachmentsList(attsList) {
+        const docsContainer = document.getElementById('recAttachmentsContainer');
+        if (!docsContainer) return;
+        docsContainer.innerHTML = '';
+        if (attsList && attsList.length > 0) {
+            attsList.forEach(fileObj => {
+                const fName = (typeof fileObj === 'string') ? fileObj : (fileObj.file_name || fileObj.name || 'Document.pdf');
+                const fType = (typeof fileObj === 'object' && fileObj.file_type) ? fileObj.file_type : (fName.split('.').pop() || 'pdf');
+                const fDate = (typeof fileObj === 'object' && fileObj.uploaded_at) ? new Date(fileObj.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Verified Copy';
+
+                const item = document.createElement('div');
+                item.className = 'uploaded-file-chip';
+                item.innerHTML = `
+                    <div class="d-flex align-center gap-2">
+                        <i class="bi bi-file-earmark-medical text-primary" style="font-size: 1.1rem;"></i>
+                        <span class="fw-semibold text-main">${escapeHtml(fName)}</span>
+                        <span class="text-muted" style="font-size: 0.72rem;">${fType.toUpperCase()} &bull; ${escapeHtml(fDate)}</span>
+                    </div>
+                    <span class="badge badge-success" style="font-size: 0.68rem;"><i class="bi bi-shield-check me-1"></i>PATIENT_FILES</span>
+                `;
+                docsContainer.appendChild(item);
+            });
+        } else {
+            docsContainer.innerHTML = `<span class="text-muted" style="font-size: 0.78rem;">No verification documents attached yet. Click "+ Upload Document" above to attach a file.</span>`;
+        }
+    }
+
+    function toggleEditEmergencyContact(show) {
+        const displayCard = document.getElementById('recEmergencyDisplayCard');
+        const editForm = document.getElementById('recEmergencyEditForm');
+        const btn = document.getElementById('btnEditEmergencyContact');
+        const lbl = document.getElementById('lblEditEmergencyBtn');
+        if (!displayCard || !editForm) return;
+
+        const isCurrentlyHidden = editForm.classList.contains('hidden');
+        const shouldShow = (show !== undefined) ? show : isCurrentlyHidden;
+
+        if (shouldShow) {
+            if (activeProfilePatient) {
+                const nameIn = document.getElementById('editEmergencyName');
+                const relIn = document.getElementById('editEmergencyRel');
+                const phoneIn = document.getElementById('editEmergencyPhone');
+                if (nameIn) nameIn.value = activeProfilePatient.emergencyName || activeProfilePatient.emergency_contact_name || '';
+                if (relIn) relIn.value = activeProfilePatient.emergencyRel || activeProfilePatient.emergency_contact_relationship || 'Spouse';
+                if (phoneIn) phoneIn.value = activeProfilePatient.emergencyPhone || activeProfilePatient.emergency_contact_number || '';
+            }
+            displayCard.classList.add('hidden');
+            editForm.classList.remove('hidden');
+            if (lbl) lbl.textContent = 'Cancel';
+        } else {
+            editForm.classList.add('hidden');
+            displayCard.classList.remove('hidden');
+            if (lbl) lbl.textContent = 'Edit';
+        }
+    }
+
+    async function saveEmergencyContact() {
+        if (!activeProfilePatient) return;
+        const nameIn = document.getElementById('editEmergencyName');
+        const relIn = document.getElementById('editEmergencyRel');
+        const phoneIn = document.getElementById('editEmergencyPhone');
+
+        const newName = nameIn ? nameIn.value.trim() : '';
+        const newRel = relIn ? relIn.value.trim() : '';
+        const newPhone = phoneIn ? phoneIn.value.trim() : '';
+
+        if (!newName || !newPhone) {
+            showNotification('Please provide emergency contact name and phone number.', 'warning');
+            return;
+        }
+
+        activeProfilePatient.emergencyName = newName;
+        activeProfilePatient.emergency_contact_name = newName;
+        activeProfilePatient.emergencyRel = newRel;
+        activeProfilePatient.emergency_contact_relationship = newRel;
+        activeProfilePatient.emergencyPhone = newPhone;
+        activeProfilePatient.emergency_contact_number = newPhone;
+
+        const recName = document.getElementById('recEmergencyName');
+        const recRel = document.getElementById('recEmergencyRel');
+        const recPhone = document.getElementById('recEmergencyPhone');
+        if (recName) recName.textContent = newName;
+        if (recRel) recRel.textContent = newRel;
+        if (recPhone) recPhone.textContent = newPhone;
+
+        // Persist to local storage
+        localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patientRegistryData));
+
+        // Call backend API if patient has an ID
+        if (activeProfilePatient.id) {
+            try {
+                await fetch(`/api/patients/${activeProfilePatient.id}/emergency-contact`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        emergency_contact_name: newName,
+                        emergency_contact_relationship: newRel,
+                        emergency_contact_number: newPhone
+                    })
+                });
+            } catch (err) {
+                console.warn('[Emergency Contact Update Offline]', err);
+            }
+        }
+
+        toggleEditEmergencyContact(false);
+        showNotification(`Emergency contact updated for ${activeProfilePatient.name}.`, 'success');
+    }
+
+    function toggleAddEnrollmentInput(show) {
+        const panel = document.getElementById('addEnrollmentPanel');
+        if (!panel) return;
+        const isHidden = panel.classList.contains('hidden');
+        const shouldShow = (show !== undefined) ? show : isHidden;
+        if (shouldShow) {
+            panel.classList.remove('hidden');
+            const customIn = document.getElementById('newEnrollmentCustom');
+            if (customIn) customIn.focus();
+        } else {
+            panel.classList.add('hidden');
+        }
+    }
+
+    async function confirmAddEnrollment() {
+        if (!activeProfilePatient) return;
+        const select = document.getElementById('newEnrollmentSelect');
+        const custom = document.getElementById('newEnrollmentCustom');
+        const prog = (custom && custom.value.trim()) || (select && select.value) || '';
+
+        if (!prog) {
+            showNotification('Please select or enter a program name to add.', 'warning');
+            return;
+        }
+
+        if (!activeProfilePatient.programs) activeProfilePatient.programs = [];
+        if (!activeProfilePatient.government_programs) activeProfilePatient.government_programs = [];
+
+        if (activeProfilePatient.programs.includes(prog)) {
+            showNotification('Patient is already enrolled in ' + prog, 'info');
+            toggleAddEnrollmentInput(false);
+            return;
+        }
+
+        activeProfilePatient.programs.push(prog);
+        activeProfilePatient.government_programs.push(prog);
+
+        // Update container in UI
+        const progContainer = document.getElementById('recProgramsContainer');
+        if (progContainer) {
+            if (progContainer.querySelector('.text-muted')) {
+                progContainer.innerHTML = '';
+            }
+            const badge = document.createElement('span');
+            badge.className = 'badge badge-primary-subtle';
+            badge.style.fontSize = '0.78rem';
+            badge.style.padding = '0.35rem 0.65rem';
+            badge.innerHTML = `<i class="bi bi-check-circle-fill text-primary me-1"></i>${escapeHtml(prog)}`;
+            progContainer.appendChild(badge);
+        }
+
+        // Persist to local storage
+        localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patientRegistryData));
+
+        if (activeProfilePatient.id) {
+            try {
+                await fetch(`/api/patients/${activeProfilePatient.id}/enrollments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ program: prog })
+                });
+            } catch (err) {
+                console.warn('[Enrollment Update Offline]', err);
+            }
+        }
+
+        if (select) select.selectedIndex = 0;
+        if (custom) custom.value = '';
+        toggleAddEnrollmentInput(false);
+        showNotification(`Enrolled in ${prog} successfully.`, 'success');
+    }
+
+    async function handleProfileDocUpload(input) {
+        if (!activeProfilePatient || !input.files || input.files.length === 0) return;
+        const file = input.files[0];
+        const fileName = file.name;
+        const fileType = fileName.split('.').pop().toLowerCase();
+
+        // Immediately reflect in UI
+        const docsContainer = document.getElementById('recAttachmentsContainer');
+        if (docsContainer) {
+            if (docsContainer.querySelector('.text-muted')) {
+                docsContainer.innerHTML = '';
+            }
+            const item = document.createElement('div');
+            item.className = 'uploaded-file-chip';
+            item.innerHTML = `
+                <div class="d-flex align-center gap-2">
+                    <i class="bi bi-file-earmark-check text-primary" style="font-size: 1.1rem;"></i>
+                    <span class="fw-semibold text-main">${escapeHtml(fileName)}</span>
+                    <span class="text-muted" style="font-size: 0.72rem;">${fileType.toUpperCase()} &bull; Uploaded Just Now</span>
+                </div>
+                <span class="badge badge-success" style="font-size: 0.68rem;"><i class="bi bi-shield-check me-1"></i>PATIENT_FILES</span>
+            `;
+            docsContainer.appendChild(item);
+        }
+
+        if (!activeProfilePatient.attachments) activeProfilePatient.attachments = [];
+        activeProfilePatient.attachments.push(fileName);
+        if (!activeProfilePatient.files) activeProfilePatient.files = [];
+        activeProfilePatient.files.push({
+            file_name: fileName,
+            file_type: fileType,
+            file_path: `uploads/${activeProfilePatient.id || 0}_${fileName}`,
+            uploaded_at: new Date().toISOString()
+        });
+
+        localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patientRegistryData));
+
+        // Call backend API to save to PATIENT_FILES table
+        if (activeProfilePatient.id) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const resp = await fetch(`/api/patients/${activeProfilePatient.id}/files`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const resData = await resp.json();
+                if (resData.success) {
+                    showNotification(`'${fileName}' saved to PATIENT_FILES for ${activeProfilePatient.name}.`, 'success');
+                }
+            } catch (err) {
+                try {
+                    await fetch(`/api/patients/${activeProfilePatient.id}/files`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file_name: fileName, file_type: fileType })
+                    });
+                    showNotification(`'${fileName}' recorded in PATIENT_FILES.`, 'success');
+                } catch (jsonErr) {
+                    console.warn('[File Upload Offline]', jsonErr);
+                }
+            }
+        } else {
+            showNotification(`'${fileName}' attached to record locally.`, 'success');
+        }
+
+        input.value = '';
     }
 
     function openPatientRecord(patientName) {
@@ -283,6 +543,12 @@
             };
         }
 
+        activeProfilePatient = patient;
+
+        // Reset subpanels
+        toggleEditEmergencyContact(false);
+        toggleAddEnrollmentInput(false);
+
         const recName = document.getElementById('recName');
         const recDemographics = document.getElementById('recDemographics');
         const recAddress = document.getElementById('recAddress');
@@ -294,8 +560,8 @@
 
         if (recName) recName.textContent = patient.name;
         if (recDemographics) {
-            let dobStr = patient.dob ? ` • Born ${formatDateDisplay(patient.dob)}` : '';
-            recDemographics.textContent = `${patient.age} years old • ${patient.sex || patient.gender || 'Unspecified'}${dobStr}`;
+            let dobStr = patient.dob ? ` &bull; Born ${formatDateDisplay(patient.dob)}` : '';
+            recDemographics.innerHTML = `${patient.age} years old &bull; ${patient.sex || patient.gender || 'Unspecified'}${dobStr}`;
         }
         if (recAddress) recAddress.textContent = patient.address ? `${patient.address}, ${patient.purok}` : (patient.purok || 'San Jose');
         if (recContact) recContact.textContent = patient.contact || patient.contact_number || "Not provided";
@@ -317,9 +583,20 @@
         const recEmergencyName = document.getElementById('recEmergencyName');
         const recEmergencyRel = document.getElementById('recEmergencyRel');
         const recEmergencyPhone = document.getElementById('recEmergencyPhone');
-        if (recEmergencyName) recEmergencyName.textContent = patient.emergencyName || patient.emergency_contact_name || "None designated";
-        if (recEmergencyRel) recEmergencyRel.textContent = patient.emergencyRel || patient.emergency_contact_relationship || "Guardian / Relative";
-        if (recEmergencyPhone) recEmergencyPhone.textContent = patient.emergencyPhone || patient.emergency_contact_number || "N/A";
+        const emName = patient.emergencyName || patient.emergency_contact_name || "None designated";
+        const emRel = patient.emergencyRel || patient.emergency_contact_relationship || "Guardian / Relative";
+        const emPhone = patient.emergencyPhone || patient.emergency_contact_number || "N/A";
+
+        if (recEmergencyName) recEmergencyName.textContent = emName;
+        if (recEmergencyRel) recEmergencyRel.textContent = emRel;
+        if (recEmergencyPhone) recEmergencyPhone.textContent = emPhone;
+
+        const nameIn = document.getElementById('editEmergencyName');
+        const relIn = document.getElementById('editEmergencyRel');
+        const phoneIn = document.getElementById('editEmergencyPhone');
+        if (nameIn) nameIn.value = (emName !== "None designated") ? emName : "";
+        if (relIn) relIn.value = emRel;
+        if (phoneIn) phoneIn.value = (emPhone !== "N/A") ? emPhone : "";
 
         const progContainer = document.getElementById('recProgramsContainer');
         if (progContainer) {
@@ -329,13 +606,13 @@
                 progs.forEach(prog => {
                     const badge = document.createElement('span');
                     badge.className = 'badge badge-primary-subtle';
-                    badge.style.fontSize = '0.75rem';
-                    badge.style.padding = '0.35rem 0.6rem';
+                    badge.style.fontSize = '0.78rem';
+                    badge.style.padding = '0.35rem 0.65rem';
                     badge.innerHTML = `<i class="bi bi-check-circle-fill text-primary me-1"></i>${escapeHtml(prog)}`;
                     progContainer.appendChild(badge);
                 });
             } else {
-                progContainer.innerHTML = `<span class="text-muted" style="font-size: 0.75rem;">No social or government program enrollments on file.</span>`;
+                progContainer.innerHTML = `<span class="text-muted" style="font-size: 0.78rem;">No social or government program enrollments on file. Click "+ Add Program" above to enroll.</span>`;
             }
         }
 
@@ -367,26 +644,21 @@
             recMedHistory.textContent = patient.medHistory || patient.medical_history || "No prior clinical history noted.";
         }
 
-        const docsContainer = document.getElementById('recAttachmentsContainer');
-        if (docsContainer) {
-            docsContainer.innerHTML = '';
-            const atts = patient.attachments || [];
-            if (atts && atts.length > 0) {
-                atts.forEach(file => {
-                    const item = document.createElement('div');
-                    item.className = 'uploaded-file-chip';
-                    item.innerHTML = `
-                        <div class="d-flex align-center gap-2">
-                            <i class="bi bi-file-earmark-medical text-primary" style="font-size: 1rem;"></i>
-                            <span class="fw-medium">${escapeHtml(file)}</span>
-                        </div>
-                        <span class="badge badge-success" style="font-size: 0.68rem;"><i class="bi bi-check-circle me-1"></i>Verified Local Copy</span>
-                    `;
-                    docsContainer.appendChild(item);
-                });
-            } else {
-                docsContainer.innerHTML = `<span class="text-muted" style="font-size: 0.75rem;">No verification documents attached.</span>`;
-            }
+        // Render document attachments from PATIENT_FILES
+        renderAttachmentsList(patient.files && patient.files.length > 0 ? patient.files : patient.attachments);
+
+        // Fetch live PATIENT_FILES from backend if patient has ID
+        if (patient.id) {
+            fetch(`/api/patients/${patient.id}/files`)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success && res.data && res.data.length > 0) {
+                        patient.files = res.data;
+                        patient.attachments = res.data.map(f => f.file_name);
+                        renderAttachmentsList(res.data);
+                    }
+                })
+                .catch(() => {});
         }
 
         openModal('patientRecordModal');
@@ -556,4 +828,9 @@
     window.toggleOtherProgramInput = toggleOtherProgramInput;
     window.getRiskBadgeClass = getRiskBadgeClass;
     window.getConditionBadgeClass = getConditionBadgeClass;
+    window.toggleEditEmergencyContact = toggleEditEmergencyContact;
+    window.saveEmergencyContact = saveEmergencyContact;
+    window.toggleAddEnrollmentInput = toggleAddEnrollmentInput;
+    window.confirmAddEnrollment = confirmAddEnrollment;
+    window.handleProfileDocUpload = handleProfileDocUpload;
 })();

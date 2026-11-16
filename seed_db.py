@@ -24,7 +24,7 @@ import random
 from datetime import date, timedelta, datetime
 from werkzeug.security import generate_password_hash
 from app import app
-from models import db, User, Patient, Inventory, Vital, Dispensation, Appointment, UpcomingEvent, AuditLog
+from models import db, User, Patient, Inventory, Vital, Dispensation, Appointment, UpcomingEvent, AuditLog, PatientFile, Consultation
 
 
 def seed_data(force=False):
@@ -313,45 +313,153 @@ def seed_data(force=False):
         db.session.commit()
         print(f"[DB Seed] Created {len(inserted_patients)} TCR patient records with complete form schemas.")
 
-        # 3. Seed Inventory items
+        # 3. Seed Inventory items (30+ items with generic names, valid categories, and dosages)
         print("[DB Seed] Seeding medicine inventory items...")
         inventory_items = [
-            Inventory(item_name="Losartan", category="Antihypertensive", quantity=250, current_stock=250, expiration_date=date(2027, 8, 15), dosage="50mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-01"),
-            Inventory(item_name="Amlodipine", category="Antihypertensive", quantity=200, current_stock=200, expiration_date=date(2027, 6, 30), dosage="10mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-02"),
-            Inventory(item_name="Metoprolol", category="Antihypertensive", quantity=150, current_stock=150, expiration_date=date(2027, 5, 20), dosage="50mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-03"),
-            Inventory(item_name="Clopidogrel", category="Cardiovascular", quantity=120, current_stock=120, expiration_date=date(2027, 9, 10), dosage="75mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-04"),
-            Inventory(item_name="Metformin", category="Anti-diabetic", quantity=300, current_stock=300, expiration_date=date(2027, 10, 12), dosage="500mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-05"),
-            Inventory(item_name="Gliclazide", category="Anti-diabetic", quantity=180, current_stock=180, expiration_date=date(2027, 7, 25), dosage="80mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-06"),
-            Inventory(item_name="Insulin Regular", category="Anti-diabetic", quantity=25, current_stock=25, expiration_date=date(2026, 12, 31), dosage="10ml Vial", unit="vials", status="Adequate", batch_no="LOT-2026-07"),
-            Inventory(item_name="Blood Glucose Test Strips", category="Supplies", quantity=15, current_stock=15, expiration_date=date(2027, 4, 10), dosage="Box of 50", unit="boxes", status="Low", batch_no="LOT-2026-08"),
-            Inventory(item_name="Paracetamol", category="Analgesic", quantity=500, current_stock=500, expiration_date=date(2028, 1, 15), dosage="500mg Tablet", unit="tabs", status="Adequate", batch_no="LOT-2026-09"),
-            Inventory(item_name="Vitamin C", category="Vitamin", quantity=400, current_stock=400, expiration_date=date(2028, 3, 30), dosage="500mg Ascorbic Acid", unit="tabs", status="Adequate", batch_no="LOT-2026-10"),
-            Inventory(item_name="Disposable Syringes", category="Supplies", quantity=300, current_stock=300, expiration_date=date(2028, 6, 1), dosage="3ml", unit="pcs", status="Adequate", batch_no="LOT-2026-11")
+            Inventory(item_name="Losartan", category="Antihypertensive (HPN Maintenance)", quantity=350, current_stock=350, expiration_date=date(2027, 8, 15), dosage="50mg", unit="tabs", status="Adequate", batch_no="LOT-2026-01"),
+            Inventory(item_name="Amlodipine", category="Antihypertensive (HPN Maintenance)", quantity=280, current_stock=280, expiration_date=date(2027, 6, 30), dosage="10mg", unit="tabs", status="Adequate", batch_no="LOT-2026-02"),
+            Inventory(item_name="Amlodipine", category="Antihypertensive (HPN Maintenance)", quantity=200, current_stock=200, expiration_date=date(2027, 5, 15), dosage="5mg", unit="tabs", status="Adequate", batch_no="LOT-2026-02B"),
+            Inventory(item_name="Metoprolol", category="Antihypertensive (HPN Maintenance)", quantity=220, current_stock=220, expiration_date=date(2027, 5, 20), dosage="50mg", unit="tabs", status="Adequate", batch_no="LOT-2026-03"),
+            Inventory(item_name="Telmisartan", category="Antihypertensive (HPN Maintenance)", quantity=150, current_stock=150, expiration_date=date(2027, 11, 10), dosage="40mg", unit="tabs", status="Adequate", batch_no="LOT-2026-12"),
+            Inventory(item_name="Carvedilol", category="Antihypertensive (HPN Maintenance)", quantity=140, current_stock=140, expiration_date=date(2027, 12, 5), dosage="25mg", unit="tabs", status="Adequate", batch_no="LOT-2026-13"),
+            Inventory(item_name="Captopril", category="Antihypertensive (HPN Maintenance)", quantity=100, current_stock=100, expiration_date=date(2027, 7, 22), dosage="25mg", unit="tabs", status="Adequate", batch_no="LOT-2026-14"),
+            Inventory(item_name="Hydrochlorothiazide", category="Antihypertensive (HPN Maintenance)", quantity=120, current_stock=120, expiration_date=date(2027, 9, 18), dosage="25mg", unit="tabs", status="Adequate", batch_no="LOT-2026-15"),
+            Inventory(item_name="Metformin", category="Anti-diabetic (DM Maintenance)", quantity=450, current_stock=450, expiration_date=date(2027, 10, 12), dosage="500mg", unit="tabs", status="Adequate", batch_no="LOT-2026-05"),
+            Inventory(item_name="Metformin", category="Anti-diabetic (DM Maintenance)", quantity=200, current_stock=200, expiration_date=date(2027, 11, 25), dosage="850mg", unit="tabs", status="Adequate", batch_no="LOT-2026-05B"),
+            Inventory(item_name="Gliclazide", category="Anti-diabetic (DM Maintenance)", quantity=250, current_stock=250, expiration_date=date(2027, 7, 25), dosage="80mg", unit="tabs", status="Adequate", batch_no="LOT-2026-06"),
+            Inventory(item_name="Gliclazide", category="Anti-diabetic (DM Maintenance)", quantity=180, current_stock=180, expiration_date=date(2027, 8, 30), dosage="30mg MR", unit="tabs", status="Adequate", batch_no="LOT-2026-06B"),
+            Inventory(item_name="Glimepiride", category="Anti-diabetic (DM Maintenance)", quantity=160, current_stock=160, expiration_date=date(2027, 10, 5), dosage="2mg", unit="tabs", status="Adequate", batch_no="LOT-2026-16"),
+            Inventory(item_name="Insulin Regular", category="Anti-diabetic (DM Maintenance)", quantity=40, current_stock=40, expiration_date=date(2026, 12, 31), dosage="100 IU/ml", unit="vials", status="Adequate", batch_no="LOT-2026-07"),
+            Inventory(item_name="Insulin NPH", category="Anti-diabetic (DM Maintenance)", quantity=35, current_stock=35, expiration_date=date(2027, 1, 20), dosage="100 IU/ml", unit="vials", status="Adequate", batch_no="LOT-2026-17"),
+            Inventory(item_name="Empagliflozin", category="Anti-diabetic (DM Maintenance)", quantity=90, current_stock=90, expiration_date=date(2027, 9, 15), dosage="10mg", unit="tabs", status="Adequate", batch_no="LOT-2026-18"),
+            Inventory(item_name="Atorvastatin", category="Statin / Lipid-lowering", quantity=300, current_stock=300, expiration_date=date(2027, 8, 10), dosage="20mg", unit="tabs", status="Adequate", batch_no="LOT-2026-19"),
+            Inventory(item_name="Simvastatin", category="Statin / Lipid-lowering", quantity=200, current_stock=200, expiration_date=date(2027, 6, 25), dosage="20mg", unit="tabs", status="Adequate", batch_no="LOT-2026-20"),
+            Inventory(item_name="Rosuvastatin", category="Statin / Lipid-lowering", quantity=120, current_stock=120, expiration_date=date(2027, 11, 18), dosage="10mg", unit="tabs", status="Adequate", batch_no="LOT-2026-21"),
+            Inventory(item_name="Fenofibrate", category="Statin / Lipid-lowering", quantity=110, current_stock=110, expiration_date=date(2027, 5, 12), dosage="160mg", unit="tabs", status="Adequate", batch_no="LOT-2026-22"),
+            Inventory(item_name="Clopidogrel", category="Cardiovascular Support", quantity=220, current_stock=220, expiration_date=date(2027, 9, 10), dosage="75mg", unit="tabs", status="Adequate", batch_no="LOT-2026-04"),
+            Inventory(item_name="Aspirin", category="Cardiovascular Support", quantity=300, current_stock=300, expiration_date=date(2027, 12, 15), dosage="80mg", unit="tabs", status="Adequate", batch_no="LOT-2026-23"),
+            Inventory(item_name="Isosorbide Mononitrate", category="Cardiovascular Support", quantity=140, current_stock=140, expiration_date=date(2027, 7, 8), dosage="30mg MR", unit="tabs", status="Adequate", batch_no="LOT-2026-24"),
+            Inventory(item_name="Nitroglycerin", category="Emergency Supply", quantity=50, current_stock=50, expiration_date=date(2027, 4, 15), dosage="0.5mg", unit="tabs", status="Adequate", batch_no="LOT-2026-25"),
+            Inventory(item_name="Epinephrine", category="Emergency Supply", quantity=25, current_stock=25, expiration_date=date(2027, 3, 30), dosage="1mg/ml", unit="ampules", status="Adequate", batch_no="LOT-2026-26"),
+            Inventory(item_name="Furosemide", category="Emergency Supply", quantity=30, current_stock=30, expiration_date=date(2027, 6, 20), dosage="20mg/2ml", unit="ampules", status="Adequate", batch_no="LOT-2026-27"),
+            Inventory(item_name="Paracetamol", category="Analgesic / Antipyretic", quantity=600, current_stock=600, expiration_date=date(2028, 1, 15), dosage="500mg", unit="tabs", status="Adequate", batch_no="LOT-2026-09"),
+            Inventory(item_name="Ibuprofen", category="Analgesic / Antipyretic", quantity=250, current_stock=250, expiration_date=date(2027, 10, 18), dosage="400mg", unit="tabs", status="Adequate", batch_no="LOT-2026-28"),
+            Inventory(item_name="Vitamin C", category="Vitamin / Supplement", quantity=500, current_stock=500, expiration_date=date(2028, 3, 30), dosage="500mg", unit="tabs", status="Adequate", batch_no="LOT-2026-10"),
+            Inventory(item_name="Vitamin B-Complex", category="Vitamin / Supplement", quantity=400, current_stock=400, expiration_date=date(2028, 2, 20), dosage="100mg/5mg/50mcg", unit="tabs", status="Adequate", batch_no="LOT-2026-29"),
+            Inventory(item_name="Calcium Carbonate + Vit D3", category="Vitamin / Supplement", quantity=250, current_stock=250, expiration_date=date(2028, 4, 10), dosage="600mg/400IU", unit="tabs", status="Adequate", batch_no="LOT-2026-30"),
+            Inventory(item_name="Blood Glucose Test Strips", category="Diagnostic / Medical Supplies", quantity=45, current_stock=45, expiration_date=date(2027, 4, 10), dosage="Box of 50", unit="boxes", status="Adequate", batch_no="LOT-2026-08"),
+            Inventory(item_name="Disposable Syringes", category="Diagnostic / Medical Supplies", quantity=400, current_stock=400, expiration_date=date(2028, 6, 1), dosage="3ml", unit="pcs", status="Adequate", batch_no="LOT-2026-11"),
+            Inventory(item_name="Disposable Syringes", category="Diagnostic / Medical Supplies", quantity=350, current_stock=350, expiration_date=date(2028, 5, 15), dosage="1ml Insulin", unit="pcs", status="Adequate", batch_no="LOT-2026-31"),
+            Inventory(item_name="Sterile Lancets", category="Diagnostic / Medical Supplies", quantity=50, current_stock=50, expiration_date=date(2028, 7, 20), dosage="Box of 100", unit="boxes", status="Adequate", batch_no="LOT-2026-32"),
+            Inventory(item_name="Alcohol Swabs", category="Diagnostic / Medical Supplies", quantity=60, current_stock=60, expiration_date=date(2028, 8, 15), dosage="Box of 100", unit="boxes", status="Adequate", batch_no="LOT-2026-33")
         ]
 
         for item in inventory_items:
             db.session.add(item)
         db.session.commit()
 
-        # 4. Seed Baseline Vitals, Dispensations, and Appointments
-        print("[DB Seed] Seeding vitals, dispensations, and appointments...")
+        # 4. Seed Baseline Vitals, Consultations, Dispensations, and Appointments
+        print("[DB Seed] Seeding vitals, consultations, dispensations, and appointments...")
         random.seed(42)
-        bp_list = ["120/80", "130/85", "118/78", "140/90", "125/82", "135/88", "115/75", "142/91"]
 
         losartan_item = Inventory.query.filter_by(item_name="Losartan").first()
         metformin_item = Inventory.query.filter_by(item_name="Metformin").first()
 
         for patient in inserted_patients:
-            # Baseline Vitals
-            vital = Vital(
-                patient_id=patient.id,
-                blood_pressure=random.choice(bp_list),
-                temperature=round(random.uniform(36.4, 37.1), 1),
-                heart_rate=random.randint(72, 88),
-                weight=round(random.uniform(50.0, 75.0), 1),
-                height=round(random.uniform(150.0, 175.0), 1)
-            )
-            db.session.add(vital)
+            cond = patient.condition or "Hypertension Only"
+            is_hpn = "Hypertension" in cond
+            is_dm = "Diabet" in cond
+
+            # Generate 3 distinct historical clinical visits per patient (at least 3 per patient)
+            # Visit 1: ~65-75 days ago (Early Sep 2026)
+            # Visit 2: ~35-45 days ago (Early Oct 2026)
+            # Visit 3: ~5-12 days ago (Early Nov 2026)
+            visit_offsets = [65 + (patient.id % 10), 35 + (patient.id % 10), 5 + (patient.id % 7)]
+
+            p_base_wt = round(52.0 + ((patient.id * 1.7) % 28), 1)
+            p_ht = round(152.0 + ((patient.id * 2.3) % 22), 1)
+            bmi_val = round(p_base_wt / ((p_ht / 100) ** 2), 1)
+            bmi_cat = "Normal" if bmi_val < 25 else ("Overweight" if bmi_val < 30 else "Obese")
+            bmi_res = f"{bmi_val} ({bmi_cat})"
+
+            for v_idx, offset_days in enumerate(visit_offsets):
+                visit_date = date.today() - timedelta(days=offset_days)
+                visit_dt = datetime.combine(visit_date, datetime.min.time()).replace(hour=8 + (patient.id % 4), minute=15 * (v_idx + 1))
+                visit_date_str = visit_date.isoformat()
+
+                # Vitals & BP/Glucose based on condition progression across visits
+                if is_hpn and is_dm:
+                    # Both: Gradual improvement over 3 visits
+                    sys_bp = [156, 144, 134][v_idx] + ((patient.id % 5) - 2)
+                    dia_bp = [98, 92, 86][v_idx] + ((patient.id % 3) - 1)
+                    glucose = [188, 158, 132][v_idx] + ((patient.id % 7) - 3)
+                    remarks_pool = [
+                        "Baseline dual review. Elevated BP and hyperglycemia; dual maintenance therapy reinforced.",
+                        "Follow-up visit. BP and glycemic index improving; advised adherence to low-sodium/low-glycemic meal plan.",
+                        "Monthly maintenance check. Conditions stabilized on current regimen; 30-day refills dispensed."
+                    ]
+                elif is_dm:
+                    # Diabetes Only: Normal BP, elevated glucose improving
+                    sys_bp = 118 + (patient.id % 6)
+                    dia_bp = 76 + (patient.id % 4)
+                    glucose = [182, 152, 126][v_idx] + ((patient.id % 7) - 3)
+                    remarks_pool = [
+                        "Target client intake. Fasting blood sugar elevated; counseling on dietary sugar restriction and Metformin.",
+                        "Follow-up glycemic review. Glucose level decreased; patient compliant with morning dosages.",
+                        "Routine consultation. Glycemic control near target; maintenance supply refilled for 30 days."
+                    ]
+                else:
+                    # Hypertension Only: Elevated BP improving, normal glucose
+                    sys_bp = [152, 142, 130][v_idx] + ((patient.id % 5) - 2)
+                    dia_bp = [96, 90, 84][v_idx] + ((patient.id % 3) - 1)
+                    glucose = 92 + (patient.id % 15)
+                    remarks_pool = [
+                        "Quarterly hypertension intake. BP elevated; Losartan maintenance adherence and low-salt intake advised.",
+                        "Monthly follow-up. Blood pressure stabilizing; patient reports no headache or dizziness.",
+                        "Routine check-up. Blood pressure controlled; 30-day maintenance supply dispensed."
+                    ]
+
+                remarks = remarks_pool[v_idx]
+
+                # Risk stratification
+                if sys_bp >= 160 or dia_bp >= 100 or glucose >= 180:
+                    risk_level = "High Risk"
+                elif sys_bp >= 140 or dia_bp >= 90 or glucose >= 140:
+                    risk_level = "Moderate"
+                else:
+                    risk_level = "Stable"
+
+                vital = Vital(
+                    patient_id=patient.id,
+                    blood_pressure=f"{sys_bp}/{dia_bp}",
+                    sys_bp=sys_bp,
+                    dia_bp=dia_bp,
+                    glucose=glucose,
+                    temperature=round(36.4 + ((patient.id + v_idx) % 7) * 0.1, 1),
+                    heart_rate=72 + ((patient.id * 3 + v_idx * 5) % 16),
+                    weight=round(p_base_wt + (v_idx * 0.2), 1),
+                    height=p_ht,
+                    bmi_result=bmi_res,
+                    risk_level=risk_level,
+                    remarks=remarks,
+                    recorded_at=visit_dt
+                )
+                db.session.add(vital)
+
+                consult = Consultation(
+                    patient_name=patient.name,
+                    sys_bp=sys_bp,
+                    dia_bp=dia_bp,
+                    glucose=glucose,
+                    weight=round(p_base_wt + (v_idx * 0.2), 1),
+                    height=p_ht,
+                    bmi_result=bmi_res,
+                    risk_level=risk_level,
+                    remarks=remarks,
+                    consult_date=visit_date_str,
+                    created_at=visit_dt
+                )
+                db.session.add(consult)
 
             # Dispensations
             if "Hypertension" in (patient.condition or "") and losartan_item:
@@ -396,17 +504,82 @@ def seed_data(force=False):
             )
             db.session.add(apt)
 
-        # 5. Seed Baseline Upcoming Community Events
+        # 5. Seed Baseline Upcoming Community Events (30+ records)
         print("[DB Seed] Seeding upcoming community events...")
         sample_evts = [
-            UpcomingEvent(date=date(2026, 11, 18), type="Health Campaign", details="Barangay-wide hypertension and diabetes screening and wellness assembly.", location="Poblacion 2 Plaza", status="Pending"),
+            UpcomingEvent(date=date(2026, 11, 18), type="Health Campaign", details="Barangay-wide hypertension and diabetes screening and wellness assembly.", location="Poblacion 2 Plaza", status="Completed"),
+            UpcomingEvent(date=date(2026, 11, 20), type="Outreach Mission", details="Mobile clinic consultation and medicine distribution for Sitio Ilaya seniors.", location="Purok 1 Health Station", status="Pending"),
             UpcomingEvent(date=date(2026, 11, 22), type="Community Assembly", details="Monthly Senior Citizen health forum and PhilHealth Konsulta orientation.", location="Poblacion 2 Barangay Hall", status="Pending"),
+            UpcomingEvent(date=date(2026, 11, 24), type="Health Campaign", details="Youth & Adult cardiovascular fitness, BMI calculation, and diet coaching.", location="Poblacion 2 Plaza", status="Pending"),
             UpcomingEvent(date=date(2026, 11, 25), type="Training Seminar", details="BHW technical refresher on digital vitals capture and cardiovascular risk stratification.", location="Nagcarlan RHU Conference Room", status="Pending"),
+            UpcomingEvent(date=date(2026, 11, 27), type="Community Assembly", details="Purok 2 community health consultation on daily sodium reduction.", location="Purok 2 Multi-Purpose Hall", status="Pending"),
             UpcomingEvent(date=date(2026, 11, 29), type="Admin Meeting", details="Quarterly primary healthcare coordination meeting with Municipal Health Officer.", location="Municipal Health Office", status="Pending"),
-            UpcomingEvent(date=date(2026, 12, 4), type="Outreach Mission", details="Mobile clinical team visiting remote sitios for medicine refills and consultations.", location="Purok 6 Covered Court", status="Pending")
+            UpcomingEvent(date=date(2026, 11, 30), type="Outreach Mission", details="Home visits and blood pressure check-ups for bedridden hypertension patients.", location="Purok 3 Covered Court", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 2), type="Health Campaign", details="National Diabetes Awareness Week free blood glucose and HbA1c testing.", location="Poblacion 2 Barangay Hall", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 4), type="Outreach Mission", details="Mobile clinical team visiting remote sitios for medicine refills and consultations.", location="Purok 6 Covered Court", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 6), type="Community Assembly", details="Sitio Centro monthly wellness and PhilHealth Konsulta onboarding drive.", location="Purok 1 Health Station", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 8), type="Training Seminar", details="Hands-on training for BHWs on emergency blood pressure triage and stabilization.", location="Nagcarlan RHU Conference Room", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 10), type="Admin Meeting", details="Monthly medicine inventory audit and stock replenishment review meeting.", location="Poblacion 2 Office", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 12), type="Outreach Mission", details="Remote medication refills distribution for Purok 4 and 5 maintenance clients.", location="Purok 4 Community Center", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 14), type="Health Campaign", details="Eye and kidney microvascular screening caravan for chronic diabetic patients.", location="Municipal Gym", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 16), type="Community Assembly", details="Purok 3 Assembly on healthy holiday dining with hypertension and diabetes.", location="Purok 3 Covered Court", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 18), type="Admin Meeting", details="Year-end BHW accomplishment review and target client registry reconciliation.", location="Municipal Health Office", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 20), type="Outreach Mission", details="Pre-holiday chronic disease monitoring and home medicine delivery.", location="Purok 7 Health Outpost", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 22), type="Community Assembly", details="Barangay Health Council community presentation on 2026 NCD control targets.", location="Poblacion 2 Barangay Hall", status="Pending"),
+            UpcomingEvent(date=date(2026, 12, 28), type="Health Campaign", details="Year-end hypertension blood pressure re-assessment and medication adherence check.", location="Poblacion 2 Plaza", status="Pending"),
+            UpcomingEvent(date=date(2027, 1, 5), type="Admin Meeting", details="New Year primary care planning meeting with Municipal Health Officer.", location="Municipal Health Office", status="Pending"),
+            UpcomingEvent(date=date(2027, 1, 8), type="Training Seminar", details="2027 TCR digital record-keeping refresher and privacy compliance orientation.", location="Nagcarlan RHU Conference Room", status="Pending"),
+            UpcomingEvent(date=date(2027, 1, 12), type="Health Campaign", details="New Year Healthy Heart campaign: Community brisk walking and vitals screening.", location="Poblacion 2 Plaza", status="Pending"),
+            UpcomingEvent(date=date(2027, 1, 15), type="Community Assembly", details="Purok 1 general assembly on salt reduction and physical activity.", location="Purok 1 Health Station", status="Pending"),
+            UpcomingEvent(date=date(2027, 1, 18), type="Outreach Mission", details="Sitio Ilaya mobile clinical team follow-up for chronic hypertension cases.", location="Purok 2 Health Station", status="Pending"),
+            UpcomingEvent(date=date(2027, 1, 22), type="Training Seminar", details="Community nutrition and meal planning seminar for diabetic diet preparation.", location="Poblacion 2 Barangay Hall", status="Pending"),
+            UpcomingEvent(date=date(2027, 1, 26), type="Admin Meeting", details="Midwife-BHW case discussion on high-risk cardiovascular cases.", location="Poblacion 2 Office", status="Pending"),
+            UpcomingEvent(date=date(2027, 1, 29), type="Outreach Mission", details="Purok 5 outreach mission: Vitals capture and quarterly maintenance refill.", location="Purok 5 Multi-Purpose Hall", status="Pending"),
+            UpcomingEvent(date=date(2027, 2, 4), type="Health Campaign", details="World Cancer & Heart Month: Integrated screening for lifestyle diseases.", location="Municipal Gym", status="Pending"),
+            UpcomingEvent(date=date(2027, 2, 10), type="Community Assembly", details="Senior Citizens Valentine wellness forum on stress management and heart health.", location="Poblacion 2 Plaza", status="Pending"),
+            UpcomingEvent(date=date(2027, 2, 14), type="Outreach Mission", details="Heart Day mobile health team: Free diagnostic testing and blood pressure checks.", location="Purok 6 Covered Court", status="Pending"),
+            UpcomingEvent(date=date(2027, 2, 20), type="Training Seminar", details="Advanced clinical monitoring techniques for BHW chronic disease leads.", location="Nagcarlan RHU Conference Room", status="Pending")
         ]
         for evt in sample_evts:
             db.session.add(evt)
+
+        # 6. Seed PATIENT_FILES (30+ records linking to patients)
+        print("[DB Seed] Seeding PATIENT_FILES records...")
+        file_templates = [
+            ("PhilHealth_MDR_Form.pdf", "pdf"),
+            ("Barangay_Residency_Cert.pdf", "pdf"),
+            ("FBS_Laboratory_Slip.pdf", "pdf"),
+            ("HbA1c_Diagnostics_Report.pdf", "pdf"),
+            ("Senior_Citizen_ID_Copy.jpg", "jpg"),
+            ("12_Lead_ECG_Baseline.png", "png"),
+            ("RHU_Prescription_Slip.pdf", "pdf"),
+            ("Barangay_Indigency_Cert.pdf", "pdf"),
+            ("Urinalysis_Clinical_Test.pdf", "pdf"),
+            ("Lipid_Profile_Report.pdf", "pdf"),
+            ("Solo_Parent_Verification.jpg", "jpg"),
+            ("PWD_Clinical_Assessment.pdf", "pdf")
+        ]
+        for idx, pt in enumerate(inserted_patients, start=1):
+            t1 = file_templates[(idx - 1) % len(file_templates)]
+            f1 = PatientFile(
+                patient_id=pt.id,
+                file_name=f"{pt.first_name}_{t1[0]}",
+                file_type=t1[1],
+                file_path=f"uploads/{pt.id}_{t1[0]}"
+            )
+            db.session.add(f1)
+            # Add second file for several patients
+            if idx in [1, 3, 5, 10, 15, 20]:
+                t2 = file_templates[(idx + 4) % len(file_templates)]
+                f2 = PatientFile(
+                    patient_id=pt.id,
+                    file_name=f"{pt.first_name}_{t2[0]}",
+                    file_type=t2[1],
+                    file_path=f"uploads/{pt.id}_{t2[0]}"
+                )
+                db.session.add(f2)
+
+        db.session.commit()
 
         db.session.commit()
         print("[DB Seed] Successfully seeded BWC-HDMS database matching complete TCR form schema!")
